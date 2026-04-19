@@ -16,7 +16,8 @@ let keys = {};
 let particles = [];
 let clouds = [];
 let bgStars = [];
-let bgStatic = null;         // pre-rendered static backdrop per level
+let bgStatic = null;         // pre-rendered static backdrop (sky/stars/mountains) per level
+let platformsStatic = null;  // pre-rendered platforms layer, drawn AFTER clouds so platforms stay on top
 const MAX_PARTICLES = 220;    // cap particles so effects can't tank FPS
 
 // ── Input ─────────────────────────────────────────────────────
@@ -1223,22 +1224,28 @@ function drawClouds() {
     });
 }
 
-// Pre-render the static scene (background + platforms) into an offscreen
-// canvas. This is the single biggest perf win: we go from hundreds of
-// gradient/path calls per frame to one drawImage per frame.
+// Pre-render the static scene into two offscreen canvases: background
+// (sky/stars/mountains) and platforms. Splitting them lets us composite
+// clouds between the two layers so platforms stay on top of drifting clouds
+// (same z-order as the original un-optimized renderer).
 function buildStaticBackground() {
-    const off = document.createElement('canvas');
-    off.width = W;
-    off.height = H;
+    const bg = document.createElement('canvas');
+    bg.width = W;
+    bg.height = H;
+    const pf = document.createElement('canvas');
+    pf.width = W;
+    pf.height = H;
     const prev = ctx;
-    ctx = off.getContext('2d');
     try {
+        ctx = bg.getContext('2d');
         drawBackgroundStatic(levelDef);
+        ctx = pf.getContext('2d');
         drawPlatforms(levelDef, platforms);
     } finally {
         ctx = prev;
     }
-    bgStatic = off;
+    bgStatic = bg;
+    platformsStatic = pf;
 }
 
 function drawMountains(levelDef) {
@@ -1642,14 +1649,18 @@ function loop(ts = 0) {
     if (!gameRunning) return;
     requestAnimationFrame(loop);
 
-    // Clear & draw static scene from the pre-rendered offscreen canvas
-    if (bgStatic) {
+    // Draw order: static backdrop → clouds (dynamic) → static platforms.
+    // Platforms are kept in a separate offscreen so they render ON TOP of
+    // the drifting clouds, matching the pre-optimization z-order.
+    if (bgStatic && platformsStatic) {
         ctx.drawImage(bgStatic, 0, 0);
+        drawClouds();
+        ctx.drawImage(platformsStatic, 0, 0);
     } else {
         drawBackgroundStatic(levelDef);
+        drawClouds();
         drawPlatforms(levelDef, platforms);
     }
-    drawClouds();
 
     // Update & draw entities
     portal.update(); portal.draw();
