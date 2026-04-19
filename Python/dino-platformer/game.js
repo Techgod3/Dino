@@ -4,7 +4,8 @@
 // ============================================================
 
 const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
+let ctx = canvas.getContext('2d');
+const realCtx = ctx;
 const W = canvas.width;
 const H = canvas.height;
 
@@ -15,6 +16,8 @@ let keys = {};
 let particles = [];
 let clouds = [];
 let bgStars = [];
+let bgStatic = null;         // pre-rendered static backdrop per level
+const MAX_PARTICLES = 220;    // cap particles so effects can't tank FPS
 
 // ── Input ─────────────────────────────────────────────────────
 window.addEventListener('keydown', e => {
@@ -34,7 +37,10 @@ function rectOverlap(a, b) {
 
 // ── Particle System ───────────────────────────────────────────
 function spawnParticles(x, y, color, count = 8, speed = 3) {
-    for (let i = 0; i < count; i++) {
+    const room = MAX_PARTICLES - particles.length;
+    if (room <= 0) return;
+    const n = Math.min(count, room);
+    for (let i = 0; i < n; i++) {
         particles.push({
             x, y,
             vx: rand(-speed, speed),
@@ -189,6 +195,151 @@ const LEVELS = [
             {type:'egg',  x:405, y:115},
         ],
         portal: {x:820, y:340},
+        playerStart: {x:40, y:380},
+    },
+    {
+        name: "Frozen Tundra",
+        bgColors: ['#0d1f3d', '#1a3a66', '#2a5b8f'],
+        groundColor: '#8fb4d9',
+        platformColor: '#b7d4ee',
+        platforms: [
+            {x:0,   y:440, w:280, h:60},
+            {x:340, y:440, w:220, h:60},
+            {x:620, y:440, w:280, h:60},
+            {x:90,  y:360, w:110, h:18},
+            {x:260, y:300, w:100, h:18},
+            {x:410, y:340, w:90,  h:18},
+            {x:540, y:290, w:110, h:18},
+            {x:700, y:330, w:120, h:18},
+            {x:150, y:230, w:100, h:18},
+            {x:330, y:190, w:100, h:18},
+            {x:510, y:210, w:110, h:18},
+            {x:680, y:240, w:90,  h:18},
+            {x:400, y:130, w:120, h:18},
+        ],
+        enemies: [
+            {type:'raptor', x:160, y:400},
+            {type:'raptor', x:460, y:400},
+            {type:'triceratops', x:720, y:400},
+            {type:'pterodactyl', x:300, y:160, range:180},
+            {type:'pterodactyl', x:600, y:180, range:150},
+            {type:'raptor', x:290, y:270},
+            {type:'raptor', x:560, y:260},
+        ],
+        collectibles: [
+            {type:'bone', x:115, y:335},
+            {type:'egg',  x:285, y:275},
+            {type:'bone', x:435, y:315},
+            {type:'bone', x:565, y:265},
+            {type:'egg',  x:725, y:305},
+            {type:'bone', x:175, y:205},
+            {type:'egg',  x:355, y:165},
+            {type:'bone', x:535, y:185},
+            {type:'bone', x:700, y:215},
+            {type:'egg',  x:425, y:105},
+        ],
+        portal: {x:820, y:380},
+        playerStart: {x:40, y:380},
+    },
+    {
+        name: "Bone Caverns",
+        bgColors: ['#12081a', '#2a1640', '#1a0a2e'],
+        groundColor: '#3a2a4a',
+        platformColor: '#5a3a6a',
+        platforms: [
+            {x:0,   y:440, w:900, h:60},
+            {x:80,  y:370, w:100, h:18},
+            {x:240, y:320, w:90,  h:18},
+            {x:380, y:370, w:110, h:18},
+            {x:540, y:310, w:100, h:18},
+            {x:690, y:360, w:120, h:18},
+            {x:150, y:260, w:90,  h:18},
+            {x:290, y:220, w:80,  h:18},
+            {x:440, y:240, w:100, h:18},
+            {x:600, y:210, w:110, h:18},
+            {x:760, y:250, w:100, h:18},
+            {x:220, y:140, w:120, h:18},
+            {x:430, y:150, w:100, h:18},
+            {x:620, y:130, w:110, h:18},
+        ],
+        enemies: [
+            {type:'raptor', x:180, y:400},
+            {type:'raptor', x:430, y:400},
+            {type:'raptor', x:720, y:400},
+            {type:'triceratops', x:550, y:400},
+            {type:'pterodactyl', x:350, y:180, range:180},
+            {type:'pterodactyl', x:680, y:170, range:140},
+            {type:'raptor', x:310, y:190},
+            {type:'raptor', x:620, y:180},
+        ],
+        collectibles: [
+            {type:'bone', x:105, y:345},
+            {type:'bone', x:265, y:295},
+            {type:'egg',  x:405, y:345},
+            {type:'bone', x:565, y:285},
+            {type:'bone', x:715, y:335},
+            {type:'egg',  x:175, y:235},
+            {type:'bone', x:315, y:195},
+            {type:'bone', x:465, y:215},
+            {type:'egg',  x:625, y:185},
+            {type:'bone', x:785, y:225},
+            {type:'bone', x:245, y:115},
+            {type:'egg',  x:455, y:125},
+            {type:'bone', x:645, y:105},
+        ],
+        portal: {x:820, y:70},
+        playerStart: {x:40, y:380},
+    },
+    {
+        name: "Meteor Strike",
+        bgColors: ['#1a0000', '#4a0500', '#2a0000'],
+        groundColor: '#5a1a00',
+        platformColor: '#8a2a00',
+        platforms: [
+            {x:0,   y:440, w:240, h:60},
+            {x:300, y:440, w:160, h:60},
+            {x:520, y:440, w:140, h:60},
+            {x:720, y:440, w:180, h:60},
+            {x:100, y:370, w:90,  h:18},
+            {x:230, y:310, w:80,  h:18},
+            {x:350, y:360, w:80,  h:18},
+            {x:470, y:300, w:100, h:18},
+            {x:610, y:340, w:90,  h:18},
+            {x:750, y:290, w:110, h:18},
+            {x:180, y:240, w:80,  h:18},
+            {x:320, y:200, w:90,  h:18},
+            {x:470, y:220, w:80,  h:18},
+            {x:610, y:190, w:100, h:18},
+            {x:360, y:120, w:130, h:18},
+            {x:590, y:90,  w:120, h:18},
+        ],
+        enemies: [
+            {type:'raptor', x:140, y:400},
+            {type:'raptor', x:340, y:400},
+            {type:'triceratops', x:560, y:400},
+            {type:'raptor', x:780, y:400},
+            {type:'pterodactyl', x:260, y:160, range:200},
+            {type:'pterodactyl', x:560, y:150, range:200},
+            {type:'pterodactyl', x:700, y:80, range:160},
+            {type:'raptor', x:260, y:280},
+            {type:'raptor', x:500, y:270},
+            {type:'triceratops', x:400, y:90},
+        ],
+        collectibles: [
+            {type:'bone', x:125, y:345},
+            {type:'egg',  x:255, y:285},
+            {type:'bone', x:375, y:335},
+            {type:'egg',  x:495, y:275},
+            {type:'bone', x:635, y:315},
+            {type:'bone', x:775, y:265},
+            {type:'egg',  x:205, y:215},
+            {type:'bone', x:345, y:175},
+            {type:'bone', x:495, y:195},
+            {type:'egg',  x:635, y:165},
+            {type:'egg',  x:385, y:95},
+            {type:'bone', x:615, y:65},
+        ],
+        portal: {x:820, y:30},
         playerStart: {x:40, y:380},
     }
 ];
@@ -1038,7 +1189,8 @@ function generateStars() {
     }
 }
 
-function drawBackground(levelDef) {
+// Static layer: gradient + fixed stars + mountains/trees/lava (per level)
+function drawBackgroundStatic(levelDef) {
     const [c1, c2, c3] = levelDef.bgColors;
     const grad = ctx.createLinearGradient(0, 0, 0, H);
     grad.addColorStop(0, c1);
@@ -1047,20 +1199,20 @@ function drawBackground(levelDef) {
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, W, H);
 
-    // Stars
+    // Static stars (twinkle baked in at a mid-alpha; avoids per-frame arcs)
     bgStars.forEach(s => {
-        s.blink += 0.03;
-        const alpha = (Math.sin(s.blink) + 1) / 2 * 0.8 + 0.2;
-        ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+        ctx.fillStyle = `rgba(255,255,255,${0.45 + s.size * 0.15})`;
         ctx.beginPath();
-        ctx.arc(s.x, s.y, s.size, 0, Math.PI*2);
+        ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
         ctx.fill();
     });
 
-    // Distant mountains/volcano silhouettes
+    // Distant mountains/volcano/trees/etc silhouettes
     drawMountains(levelDef);
+}
 
-    // Clouds/mist
+// Dynamic layer: clouds drift across the screen each frame
+function drawClouds() {
     clouds.forEach(c => {
         c.x -= c.speed;
         if (c.x + c.w < 0) c.x = W;
@@ -1069,6 +1221,24 @@ function drawBackground(levelDef) {
         ctx.ellipse(c.x + c.w/2, c.y, c.w/2, c.h/2, 0, 0, Math.PI*2);
         ctx.fill();
     });
+}
+
+// Pre-render the static scene (background + platforms) into an offscreen
+// canvas. This is the single biggest perf win: we go from hundreds of
+// gradient/path calls per frame to one drawImage per frame.
+function buildStaticBackground() {
+    const off = document.createElement('canvas');
+    off.width = W;
+    off.height = H;
+    const prev = ctx;
+    ctx = off.getContext('2d');
+    try {
+        drawBackgroundStatic(levelDef);
+        drawPlatforms(levelDef, platforms);
+    } finally {
+        ctx = prev;
+    }
+    bgStatic = off;
 }
 
 function drawMountains(levelDef) {
@@ -1128,6 +1298,95 @@ function drawMountains(levelDef) {
             ctx.arc(tx + 30, H - th - 8, 22, 0, Math.PI*2);
             ctx.fill();
         }
+    }
+
+    if (levelDef.name.includes('Tundra') || levelDef.name.includes('Glacier')) {
+        // Snowy peaks
+        ctx.fillStyle = '#6a7a90';
+        for (let i = 0; i < 4; i++) {
+            const bx = 90 + i * 240;
+            const bh = 120 + (i % 2) * 40;
+            ctx.beginPath();
+            ctx.moveTo(bx - 110, H);
+            ctx.lineTo(bx, H - bh);
+            ctx.lineTo(bx + 110, H);
+            ctx.closePath(); ctx.fill();
+            // Snow cap
+            ctx.fillStyle = '#e8f2ff';
+            ctx.beginPath();
+            ctx.moveTo(bx - 28, H - bh + 30);
+            ctx.lineTo(bx, H - bh);
+            ctx.lineTo(bx + 28, H - bh + 30);
+            ctx.lineTo(bx + 14, H - bh + 26);
+            ctx.lineTo(bx + 4, H - bh + 34);
+            ctx.lineTo(bx - 10, H - bh + 24);
+            ctx.closePath(); ctx.fill();
+            ctx.fillStyle = '#6a7a90';
+        }
+        // Frozen ground glaze
+        ctx.fillStyle = 'rgba(200,230,255,0.25)';
+        ctx.fillRect(0, H - 60, W, 4);
+    }
+
+    if (levelDef.name.includes('Cavern') || levelDef.name.includes('Cave')) {
+        // Stalactites from the top
+        ctx.fillStyle = '#2a1a3a';
+        for (let i = 0; i < 14; i++) {
+            const sx = i * 66 + 12;
+            const sh = 30 + ((i * 53) % 40);
+            ctx.beginPath();
+            ctx.moveTo(sx - 10, 0);
+            ctx.lineTo(sx, sh);
+            ctx.lineTo(sx + 10, 0);
+            ctx.closePath(); ctx.fill();
+        }
+        // Glowing crystal clusters on the walls
+        const crystalSpots = [[40, 340], [860, 300], [60, 240], [840, 200]];
+        crystalSpots.forEach(([cx, cy]) => {
+            ctx.fillStyle = 'rgba(170,120,255,0.9)';
+            ctx.beginPath();
+            ctx.moveTo(cx, cy - 14);
+            ctx.lineTo(cx + 8, cy);
+            ctx.lineTo(cx, cy + 10);
+            ctx.lineTo(cx - 8, cy);
+            ctx.closePath(); ctx.fill();
+            ctx.fillStyle = 'rgba(230,200,255,0.7)';
+            ctx.beginPath();
+            ctx.arc(cx - 2, cy - 4, 2, 0, Math.PI * 2);
+            ctx.fill();
+        });
+    }
+
+    if (levelDef.name.includes('Meteor') || levelDef.name.includes('Apocalypse')) {
+        // Angry sky glow
+        const skyGrad = ctx.createRadialGradient(W / 2, H, 30, W / 2, H, W);
+        skyGrad.addColorStop(0, 'rgba(255,140,0,0.35)');
+        skyGrad.addColorStop(1, 'rgba(120,0,0,0)');
+        ctx.fillStyle = skyGrad;
+        ctx.fillRect(0, 0, W, H);
+        // Falling meteor streaks (static)
+        ctx.strokeStyle = '#ffcc66';
+        ctx.lineWidth = 2;
+        const streaks = [[100, 30, 180, 120], [420, 10, 500, 110], [720, 20, 820, 140]];
+        streaks.forEach(([x1, y1, x2, y2]) => {
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+            ctx.fillStyle = '#ff7722';
+            ctx.beginPath();
+            ctx.arc(x2, y2, 5, 0, Math.PI * 2);
+            ctx.fill();
+        });
+        // Jagged cliff silhouette in the distance
+        ctx.fillStyle = '#1a0000';
+        ctx.beginPath();
+        ctx.moveTo(0, H);
+        for (let x = 0; x <= W; x += 40) {
+            ctx.lineTo(x, H - 90 - Math.abs(Math.sin(x * 0.03)) * 80);
+        }
+        ctx.lineTo(W, H);
+        ctx.closePath(); ctx.fill();
     }
 }
 
@@ -1208,6 +1467,7 @@ function loadLevel(levelIdx) {
     particles = [];
     generateClouds();
     generateStars();
+    buildStaticBackground();
     levelTransitioning = false;
     document.getElementById('level-display').textContent = `Level ${levelIdx}`;
 }
@@ -1274,9 +1534,14 @@ function restartGame() {
     loadLevel(1);
     document.getElementById('overlay').style.display = 'none';
     document.getElementById('message-box').style.display = 'none';
+    messageActive = false;
+    const wasRunning = gameRunning;
     gameRunning = true;
     gameOver = false;
-    messageActive = false;
+    // The main loop returns early when gameRunning is false, so we need to
+    // kick it back off after a game-over or win. Guard against kicking a
+    // second loop if one is somehow still active.
+    if (!wasRunning) loop();
 }
 
 function startGame() {
@@ -1377,9 +1642,14 @@ function loop(ts = 0) {
     if (!gameRunning) return;
     requestAnimationFrame(loop);
 
-    // Clear
-    drawBackground(levelDef);
-    drawPlatforms(levelDef, platforms);
+    // Clear & draw static scene from the pre-rendered offscreen canvas
+    if (bgStatic) {
+        ctx.drawImage(bgStatic, 0, 0);
+    } else {
+        drawBackgroundStatic(levelDef);
+        drawPlatforms(levelDef, platforms);
+    }
+    drawClouds();
 
     // Update & draw entities
     portal.update(); portal.draw();
