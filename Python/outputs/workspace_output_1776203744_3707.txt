@@ -1,0 +1,30 @@
+31:    return a.x < b.x + b.w && a.x + a.w > b.x &&
+32:           a.y < b.y + b.h && a.y + a.h > b.y;
+37:    for (let i = 0; i < count; i++) {
+233:            if (this.jumpCount < this.maxJumps) {
+245:        if (this._jumpHeld && this.vy < -4 && !(keys['Space'] || keys['ArrowUp'] || keys['KeyW'])) {
+266:                if (this.vy >= 0 && this.y + this.h - this.vy <= p.y + 5) {
+273:                else if (this.vy < 0 && this.y - this.vy >= p.y + p.h - 5) {
+280:                    else if (this.vx < 0) this.x = p.x + p.w;
+297:            this.state = this.vy < 0 ? 'jump' : 'fall';
+321:        if (lives <= 0) {
+521:                if (this.vy >= 0 && this.y + this.h - this.vy <= p.y + 5) {
+525:                } else if (this.vy < 0) {
+535:        if (this.x < this.startX - this.patrolRange || this.x > this.startX + this.patrolRange) {
+538:        if (this.x < 0 || this.x + this.w > W) { this.vx = -this.vx; }
+651:        if (this.x < this.startX - this.range || this.x + this.w > this.startX + this.range) {
+655:        if (this.x < 0) { this.vx = Math.abs(this.vx); this.facing = 1; }
+776:                if (this.vy >= 0 && this.y + this.h - this.vy <= p.y + 5) {
+778:                } else if (this.vy < 0) {
+785:        if (this.x < this.startX - this.patrolRange || this.x > this.startX + this.patrolRange) {
+788:        if (this.x < 0 || this.x + this.w > W) this.vx = -this.vx;
+825:        for (let i = -1; i <= 1; i++) {
+845:        for (let i = 0; i < 4; i++) {
+885:        for (let s = -1; s <= 1; s += 2) {
+998:        for (let i = 0; i < 6; i++) {
+1024:    for (let i = 0; i < 8; i++) {
+1036:    for (let i = 0; i < 80; i++) {
+1066:        if (c.x + c.w < 0) c.x = W;
+1081:        for (let i = 0; i < 3; i++) {
+1115:        for (let i = 0; i < 12; i++) {
+1148:            for (let gx = 30; gx < p.w - 20; gx += 55) {

@@ -1,0 +1,4 @@
+Fixed line 1251: TRY AGAIN button
+Fixed line 1264: PLAY AGAIN button
+All fixes applied!
+onclick remaining: 0

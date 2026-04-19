@@ -1,0 +1,20 @@
+
+    // Collisions
+    if (!messageActive && !levelTransitioning) {
+        checkCollisions();
+    }
+
+    // Handle message dismissal
+    if (messageActive && (keys['Space'] || keys['Enter'])) {
+        hideMessage();
+    }
+
+    updateParticles();
+    drawParticles();
+    drawCanvasHUD();
+}
+
+// ── Kick off ──────────────────────────────────────────────────
+generateStars();
+generateClouds();
+</script>

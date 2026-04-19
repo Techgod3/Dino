@@ -1,0 +1,2 @@
+1251:        <button id="start-btn" onclick="restartGame()">🔄 TRY AGAIN</button>
+1264:        <button id="start-btn" onclick="restartGame()">🔄 PLAY AGAIN</button>

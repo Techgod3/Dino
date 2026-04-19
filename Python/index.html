@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🦕 DinoLand - Prehistoric Platformer</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+        background: #1a0a2e;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        font-family: 'Courier New', monospace;
+        overflow: hidden;
+    }
+    
+    #game-wrapper {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    #hud {
+        width: 900px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 16px;
+        background: rgba(0,0,0,0.6);
+        border: 2px solid #ff6b1a;
+        border-bottom: none;
+        border-radius: 8px 8px 0 0;
+        color: #fff;
+        font-size: 16px;
+        font-weight: bold;
+    }
+    
+    .hud-item { display: flex; align-items: center; gap: 6px; }
+    .hud-item span:first-child { font-size: 20px; }
+    #lives-display { color: #ff4444; }
+    #score-display { color: #ffd700; }
+    #bones-display { color: #f0e68c; }
+    #level-display { color: #90ee90; }
+    
+    canvas {
+        border: 3px solid #ff6b1a;
+        border-radius: 0 0 8px 8px;
+        display: block;
+        image-rendering: pixelated;
+    }
+    
+    #overlay {
+        position: absolute;
+        top: 44px;
+        left: 0;
+        width: 900px;
+        height: 500px;
+        background: rgba(0,0,0,0.85);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        border-radius: 0 0 8px 8px;
+        z-index: 10;
+    }
+    
+    #overlay h1 {
+        font-size: 52px;
+        color: #ff6b1a;
+        text-shadow: 0 0 20px #ff6b1a, 3px 3px 0 #8b3a00;
+        margin-bottom: 10px;
+        letter-spacing: 3px;
+    }
+    #overlay .subtitle {
+        color: #ffd700;
+        font-size: 18px;
+        margin-bottom: 30px;
+        text-align: center;
+    }
+    #overlay .controls-info {
+        color: #aaa;
+        font-size: 13px;
+        text-align: center;
+        margin-bottom: 30px;
+        line-height: 2;
+        background: rgba(255,255,255,0.05);
+        padding: 14px 30px;
+        border-radius: 8px;
+        border: 1px solid #333;
+    }
+    #overlay .controls-info span { color: #fff; font-weight: bold; }
+    #start-btn {
+        padding: 14px 50px;
+        font-size: 22px;
+        font-family: 'Courier New', monospace;
+        font-weight: bold;
+        background: linear-gradient(135deg, #ff6b1a, #cc4400);
+        color: white;
+        border: 3px solid #ffd700;
+        border-radius: 8px;
+        cursor: pointer;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        transition: all 0.2s;
+        box-shadow: 0 4px 15px rgba(255,107,26,0.5);
+    }
+    #start-btn:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(255,107,26,0.8);
+        background: linear-gradient(135deg, #ff8844, #ee5500);
+    }
+    #overlay .deco { font-size: 60px; margin-bottom: 5px; }
+    
+    #message-box {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0,0,0,0.9);
+        border: 3px solid #ffd700;
+        border-radius: 12px;
+        padding: 20px 40px;
+        text-align: center;
+        z-index: 20;
+        display: none;
+    }
+    #message-box h2 { color: #ffd700; font-size: 28px; margin-bottom: 10px; }
+    #message-box p { color: #fff; font-size: 16px; }
+  </style>
+  <script src="https://sites.super.myninja.ai/_assets/ninja-daytona-script.js"></script>
+</head>
+<body style="padding-top: 0px;">
+  <div id="game-wrapper">
+    <div id="hud">
+      <div class="hud-item"><span>🦕</span> <span>DinoLand</span></div>
+      <div class="hud-item"><span>🦴</span> <span id="bones-display">Bones: 0</span></div>
+      <div class="hud-item"><span>⭐</span> <span id="score-display">Score: 0</span></div>
+      <div class="hud-item"><span>❤️</span> <span id="lives-display">x3</span></div>
+      <div class="hud-item"><span>🌋</span> <span id="level-display">Level 1</span></div>
+    </div><canvas id="gameCanvas" width="900" height="500"></canvas>
+    <div id="overlay">
+      <div class="deco">🦕🦖🌋</div>
+      <h1>DINOLAND</h1>
+      <div class="subtitle">A Prehistoric Adventure</div>
+      <div class="controls-info"><span>← →</span> Move  |  <span>SPACE / ↑</span> Jump (double jump!)  |  <span>↓</span>
+        Stomp<br />
+        Collect <span>🦴 Bones</span> and <span>🥚 Eggs</span> | Stomp enemies to defeat them<br />
+        Reach the <span>🚪 Exit Portal</span> to advance!
+      </div><button id="start-btn">▶ PLAY NOW</button>
+    </div>
+    <div id="message-box">
+      <h2 id="msg-title"></h2>
+      <p id="msg-body"></p>
+    </div>
+  </div>
+  <div>
+
+  </div>
+  <div id="ninja-disconnect-overlay">
+    <div id="ninja-disconnect-overlay-text">Connection to Ninja computer lost.</div>
+    <div id="ninja-disconnect-overlay-text-2">Please reconnect to continue.</div><button
+      id="ninja-disconnect-reconnect-button"><span id="ninja-disconnect-spinner"></span><span
+        id="ninja-disconnect-button-text">Reconnect</span></button>
+  </div>
+  <script src="game.js"></script>
+</body>
+</html>
