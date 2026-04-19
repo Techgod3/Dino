@@ -167,6 +167,11 @@
       id="ninja-disconnect-reconnect-button"><span id="ninja-disconnect-spinner"></span><span
         id="ninja-disconnect-button-text">Reconnect</span></button>
   </div>
-  <script src="game.js"></script>
+  <script src="dino-platformer/game.js"></script>
+  <script>
+    document.getElementById('start-btn').addEventListener('click', function() {
+        if (window.startGame) window.startGame();
+    });
+  </script>
 </body>
 </html>
