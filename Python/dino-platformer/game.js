@@ -21,6 +21,51 @@ let camera = {x: 0, y: 0};
 let boss = null;           // active boss instance on boss levels
 let bossProjectiles = [];  // fire / spike / vine projectiles
 
+// ── Skin / Shop System ───────────────────────────────────────
+// Each skin is a palette swap of the dino. "rainbow" is special: cycles hue over time.
+const SKINS = [
+    { id: 'classic', name: 'Classic Rex',  emoji: '🦖', cost: 0,
+      mid: '#3aaa3a', dark: '#2d8a2d', darker: '#1a6b1a', belly: '#90ee90' },
+    { id: 'azure',   name: 'Azure Raptor', emoji: '🔷', cost: 25,
+      mid: '#3a8aee', dark: '#2d6fc9', darker: '#1a4a8a', belly: '#aac4f0' },
+    { id: 'crimson', name: 'Crimson Fang', emoji: '🔥', cost: 50,
+      mid: '#ee3a3a', dark: '#c92d2d', darker: '#8a1a1a', belly: '#f0aaaa' },
+    { id: 'golden',  name: 'Golden Tyrant',emoji: '⭐', cost: 100,
+      mid: '#ffd700', dark: '#cfa800', darker: '#8a6f00', belly: '#fff0aa' },
+    { id: 'shadow',  name: 'Shadow Stalker',emoji: '🌑', cost: 150,
+      mid: '#4a4a55', dark: '#2a2a33', darker: '#111',    belly: '#8a8a99' },
+    { id: 'rainbow', name: 'Prismarex',    emoji: '🌈', cost: 300,
+      mid: '#ff00ff', dark: '#cc00cc', darker: '#880088', belly: '#ffccff', rainbow: true },
+];
+
+const SAVE_KEY = 'dinoland_save_v1';
+function defaultSave() {
+    return { bones: 0, owned: ['classic'], equipped: 'classic' };
+}
+let save = defaultSave();
+
+function loadSave() {
+    try {
+        const raw = localStorage.getItem(SAVE_KEY);
+        if (!raw) { save = defaultSave(); return; }
+        const data = JSON.parse(raw);
+        save = {
+            bones: Math.max(0, parseInt(data.bones, 10) || 0),
+            owned: Array.isArray(data.owned) && data.owned.length ? data.owned : ['classic'],
+            equipped: typeof data.equipped === 'string' ? data.equipped : 'classic',
+        };
+        if (!save.owned.includes('classic')) save.owned.push('classic');
+        if (!save.owned.includes(save.equipped)) save.equipped = 'classic';
+    } catch (_) { save = defaultSave(); }
+}
+function writeSave() {
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (_) {}
+}
+function getSkin(id) { return SKINS.find(s => s.id === id) || SKINS[0]; }
+function currentSkin() { return getSkin(save.equipped); }
+loadSave();
+bones = save.bones; // wallet persists across runs
+
 // ── Input ─────────────────────────────────────────────────────
 window.addEventListener('keydown', e => {
     keys[e.code] = true;
@@ -291,6 +336,9 @@ class Player {
         this.invincible = 0;
         this.stompCooldown = 0;
         this.tailWag = 0;
+        // Palette swap via equipped shop skin
+        this.skin = currentSkin();
+        this.skinTime = 0; // used by rainbow skin
     }
 
     update(platforms) {
@@ -426,6 +474,21 @@ class Player {
         const idleBob = this.state === 'idle' ? Math.sin(this.tailWag * 0.5) * 1.5 : 0;
         ctx.translate(0, bob + idleBob);
 
+        // ── Resolve skin palette (rainbow cycles hue over time) ──
+        this.skinTime += 0.05;
+        let PAL_MID, PAL_DARK, PAL_DARKER, PAL_BELLY;
+        if (this.skin && this.skin.rainbow) {
+            const h = (this.skinTime * 30) % 360;
+            PAL_MID    = `hsl(${h},80%,55%)`;
+            PAL_DARK   = `hsl(${(h+20)%360},80%,42%)`;
+            PAL_DARKER = `hsl(${(h+40)%360},75%,28%)`;
+            PAL_BELLY  = `hsl(${(h+180)%360},80%,78%)`;
+        } else {
+            const s = this.skin || SKINS[0];
+            PAL_MID    = s.mid;    PAL_DARK   = s.dark;
+            PAL_DARKER = s.darker; PAL_BELLY  = s.belly;
+        }
+
         // Shadow
         ctx.fillStyle = 'rgba(0,0,0,0.3)';
         ctx.beginPath();
@@ -437,43 +500,43 @@ class Player {
         ctx.save();
         ctx.translate(-this.w/2 + 2, 2);
         ctx.rotate(tailWag);
-        ctx.fillStyle = '#2d8a2d';
+        ctx.fillStyle = PAL_DARK;
         ctx.beginPath();
         ctx.ellipse(-8, 4, 14, 7, -0.4, 0, Math.PI*2);
         ctx.fill();
         // Tail tip
-        ctx.fillStyle = '#1a6b1a';
+        ctx.fillStyle = PAL_DARKER;
         ctx.beginPath();
         ctx.ellipse(-18, 8, 7, 4, -0.6, 0, Math.PI*2);
         ctx.fill();
         ctx.restore();
 
         // Body
-        ctx.fillStyle = '#3aaa3a';
+        ctx.fillStyle = PAL_MID;
         ctx.beginPath();
         ctx.ellipse(0, 4, 16, 20, 0, 0, Math.PI*2);
         ctx.fill();
 
         // Belly
-        ctx.fillStyle = '#90ee90';
+        ctx.fillStyle = PAL_BELLY;
         ctx.beginPath();
         ctx.ellipse(4, 8, 9, 14, 0.2, 0, Math.PI*2);
         ctx.fill();
 
         // Neck + Head
-        ctx.fillStyle = '#3aaa3a';
+        ctx.fillStyle = PAL_MID;
         ctx.beginPath();
         ctx.ellipse(8, -14, 10, 14, 0.3, 0, Math.PI*2);
         ctx.fill();
 
         // Head
-        ctx.fillStyle = '#3aaa3a';
+        ctx.fillStyle = PAL_MID;
         ctx.beginPath();
         ctx.ellipse(16, -22, 13, 10, 0.15, 0, Math.PI*2);
         ctx.fill();
 
         // Snout
-        ctx.fillStyle = '#2d8a2d';
+        ctx.fillStyle = PAL_DARK;
         ctx.beginPath();
         ctx.ellipse(26, -20, 9, 6, 0.1, 0, Math.PI*2);
         ctx.fill();
@@ -494,7 +557,7 @@ class Player {
         ctx.fill();
 
         // Nostril
-        ctx.fillStyle = '#1a6b1a';
+        ctx.fillStyle = PAL_DARKER;
         ctx.beginPath();
         ctx.arc(30, -22, 1.5, 0, Math.PI*2);
         ctx.fill();
@@ -507,7 +570,7 @@ class Player {
         }
 
         // Arms (tiny T-Rex arms!)
-        ctx.fillStyle = '#2d8a2d';
+        ctx.fillStyle = PAL_DARK;
         // Upper arm
         ctx.beginPath();
         ctx.ellipse(14, -2, 5, 3, 0.5, 0, Math.PI*2);
@@ -524,7 +587,7 @@ class Player {
 
         // Legs
         const legSwing = this.state === 'run' ? Math.sin(this.frame * 1.5) * 0.4 : 0;
-        ctx.fillStyle = '#2d8a2d';
+        ctx.fillStyle = PAL_DARK;
         // Left leg
         ctx.save();
         ctx.translate(-4, 14);
@@ -532,7 +595,7 @@ class Player {
         ctx.beginPath();
         ctx.ellipse(0, 5, 5, 9, 0, 0, Math.PI*2);
         ctx.fill();
-        ctx.fillStyle = '#1a6b1a';
+        ctx.fillStyle = PAL_DARKER;
         ctx.beginPath();
         ctx.ellipse(-2, 14, 6, 4, -0.2, 0, Math.PI*2);
         ctx.fill();
@@ -542,10 +605,10 @@ class Player {
         ctx.translate(4, 14);
         ctx.rotate(legSwing);
         ctx.beginPath();
-        ctx.fillStyle = '#2d8a2d';
+        ctx.fillStyle = PAL_DARK;
         ctx.ellipse(0, 5, 5, 9, 0, 0, Math.PI*2);
         ctx.fill();
-        ctx.fillStyle = '#1a6b1a';
+        ctx.fillStyle = PAL_DARKER;
         ctx.beginPath();
         ctx.ellipse(2, 14, 6, 4, 0.2, 0, Math.PI*2);
         ctx.fill();
@@ -1606,6 +1669,9 @@ function updateHUD() {
     document.getElementById('score-display').textContent = `Score: ${score}`;
     document.getElementById('lives-display').textContent = `x${lives}`;
     document.getElementById('bones-display').textContent = `Bones: ${bones}`;
+    // Persist wallet whenever HUD changes (every pickup / damage event)
+    save.bones = bones;
+    writeSave();
 }
 
 // ── Messages ──────────────────────────────────────────────────
@@ -1628,6 +1694,9 @@ function hideMessage() {
 }
 
 // ── Game Over / Win ───────────────────────────────────────────
+const BTN_STYLE = 'padding:12px 28px;font-size:18px;font-family:Courier New,monospace;font-weight:bold;background:linear-gradient(135deg,#ff6b1a,#cc4400);color:white;border:3px solid #ffd700;border-radius:8px;cursor:pointer;margin:6px;';
+const SHOP_BTN_STYLE = 'padding:12px 28px;font-size:18px;font-family:Courier New,monospace;font-weight:bold;background:linear-gradient(135deg,#6b3aff,#3a1a88);color:white;border:3px solid #ffd700;border-radius:8px;cursor:pointer;margin:6px;';
+
 function triggerGameOver() {
     gameRunning = false;
     gameOver = true;
@@ -1636,11 +1705,20 @@ function triggerGameOver() {
         <div class="deco">💀</div>
         <h1 style="color:#ff4444">GAME OVER</h1>
         <div class="subtitle" style="color:#ffaa66">The dinos got you! Score: ${score}</div>
-        <div class="controls-info">You collected <span>${bones} bones</span> and <span>${score} points</span></div>
-        <button id=\"start-btn\" style=\"padding:14px 40px;font-size:20px;font-family:Courier New,monospace;font-weight:bold;background:linear-gradient(135deg,#ff6b1a,#cc4400);color:white;border:3px solid #ffd700;border-radius:8px;cursor:pointer;\">🔄 TRY AGAIN</button>
+        <div class="controls-info">You have <span>${bones} 🦴 bones</span> banked — spend them in the shop!</div>
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;">
+            <button id="retry-btn" style="${BTN_STYLE}">🔄 TRY AGAIN</button>
+            <button id="shop-btn-over" style="${SHOP_BTN_STYLE}">🛒 GO TO SHOP</button>
+        </div>
     `;
     ov.style.display = 'flex';
-    setTimeout(() => { const b = document.getElementById('start-btn'); if(b) b.addEventListener('click', restartGame); }, 50);
+    // Wire the buttons on the NEXT tick so the DOM has updated
+    requestAnimationFrame(() => {
+        const r = document.getElementById('retry-btn');
+        if (r) r.addEventListener('click', restartGame);
+        const s = document.getElementById('shop-btn-over');
+        if (s) s.addEventListener('click', openShop);
+    });
 }
 
 function triggerWin() {
@@ -1650,33 +1728,142 @@ function triggerWin() {
         <div class="deco">🏆🦕🎉</div>
         <h1 style="color:#ffd700">YOU WIN!</h1>
         <div class="subtitle" style="color:#90ee90">The dinos are free! Final Score: ${score}</div>
-        <div class="controls-info">Bones collected: <span>${bones}</span> | Final score: <span>${score}</span></div>
-        <button id=\"start-btn\" style=\"padding:14px 40px;font-size:20px;font-family:Courier New,monospace;font-weight:bold;background:linear-gradient(135deg,#ff6b1a,#cc4400);color:white;border:3px solid #ffd700;border-radius:8px;cursor:pointer;\">🔄 PLAY AGAIN</button>
+        <div class="controls-info">Bones banked: <span>${bones} 🦴</span> — spend them on sweet new skins!</div>
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;">
+            <button id="retry-btn" style="${BTN_STYLE}">🔄 PLAY AGAIN</button>
+            <button id="shop-btn-win" style="${SHOP_BTN_STYLE}">🛒 GO TO SHOP</button>
+        </div>
     `;
     ov.style.display = 'flex';
-    setTimeout(() => { const b = document.getElementById('start-btn'); if(b) b.addEventListener('click', restartGame); }, 50);
+    requestAnimationFrame(() => {
+        const r = document.getElementById('retry-btn');
+        if (r) r.addEventListener('click', restartGame);
+        const s = document.getElementById('shop-btn-win');
+        if (s) s.addEventListener('click', openShop);
+    });
 }
 
 function restartGame() {
-    score = 0; lives = 5; bones = 0; currentLevel = 1;
+    // Keep the bones wallet persistent across runs — only reset per-run state
+    score = 0; lives = 5; currentLevel = 1;
     updateHUD();
-    loadLevel(1);
     document.getElementById('overlay').style.display = 'none';
     document.getElementById('message-box').style.display = 'none';
-    gameRunning = true;
+    const shopEl = document.getElementById('shop-overlay');
+    if (shopEl) shopEl.style.display = 'none';
+    loadLevel(1);
     gameOver = false;
     messageActive = false;
+    // Critical: the loop exits when gameRunning becomes false, so we must restart it.
+    if (!gameRunning) {
+        gameRunning = true;
+        loop();
+    } else {
+        gameRunning = true;
+    }
 }
 
 function startGame() {
     document.getElementById('overlay').style.display = 'none';
+    const shopEl = document.getElementById('shop-overlay');
+    if (shopEl) shopEl.style.display = 'none';
     // Optional ?level=N URL param for jumping to a specific level (handy for boss testing)
     const urlLvl = parseInt(new URLSearchParams(location.search).get('level'), 10);
     const startLvl = (Number.isFinite(urlLvl) && urlLvl >= 1 && urlLvl <= TOTAL_LEVELS) ? urlLvl : 1;
     currentLevel = startLvl;
     loadLevel(startLvl);
-    gameRunning = true;
-    loop();
+    if (!gameRunning) {
+        gameRunning = true;
+        loop();
+    } else {
+        gameRunning = true;
+    }
+}
+
+// ── Shop ─────────────────────────────────────────────────────
+function renderShop() {
+    const el = document.getElementById('shop-overlay');
+    if (!el) return;
+    const cards = SKINS.map(s => {
+        const owned = save.owned.includes(s.id);
+        const equipped = save.equipped === s.id;
+        const affordable = bones >= s.cost;
+        let btnLabel, btnClass, btnDisabled;
+        if (equipped)       { btnLabel = 'EQUIPPED';           btnClass = 'shop-btn equipped'; btnDisabled = true; }
+        else if (owned)     { btnLabel = 'EQUIP';              btnClass = 'shop-btn equip';    btnDisabled = false; }
+        else if (affordable){ btnLabel = `BUY · ${s.cost} 🦴`; btnClass = 'shop-btn buy';      btnDisabled = false; }
+        else                { btnLabel = `${s.cost} 🦴`;      btnClass = 'shop-btn locked';   btnDisabled = true; }
+        // Preview swatch: three color circles
+        return `
+            <div class="skin-card ${equipped ? 'active' : ''}">
+                <div class="skin-emoji">${s.emoji}${s.rainbow ? '✨' : ''}</div>
+                <div class="skin-name">${s.name}</div>
+                <div class="skin-swatch">
+                    <span style="background:${s.mid}"></span>
+                    <span style="background:${s.dark}"></span>
+                    <span style="background:${s.belly}"></span>
+                </div>
+                <button class="${btnClass}" data-skin="${s.id}" ${btnDisabled ? 'disabled' : ''}>${btnLabel}</button>
+            </div>`;
+    }).join('');
+
+    el.innerHTML = `
+        <div class="shop-inner">
+            <h2 class="shop-title">🛒 BONE SHOP 🦴</h2>
+            <div class="shop-wallet">Wallet: <b>${bones} 🦴</b></div>
+            <div class="skin-grid">${cards}</div>
+            <div class="shop-actions">
+                <button id="shop-play" style="${BTN_STYLE}">${gameOver ? '🔄 TRY AGAIN' : '▶ PLAY'}</button>
+                <button id="shop-back" style="${SHOP_BTN_STYLE.replace('#6b3aff','#555').replace('#3a1a88','#222')}">✖ CLOSE</button>
+            </div>
+        </div>`;
+
+    el.querySelectorAll('.shop-btn').forEach(b => {
+        b.addEventListener('click', () => {
+            const id = b.getAttribute('data-skin');
+            if (b.classList.contains('buy')) buySkin(id);
+            else if (b.classList.contains('equip')) equipSkin(id);
+        });
+    });
+    document.getElementById('shop-play').addEventListener('click', () => {
+        el.style.display = 'none';
+        if (gameOver) restartGame(); else startGame();
+    });
+    document.getElementById('shop-back').addEventListener('click', closeShop);
+}
+
+function openShop() {
+    const el = document.getElementById('shop-overlay');
+    if (!el) return;
+    el.style.display = 'flex';
+    renderShop();
+}
+function closeShop() {
+    const el = document.getElementById('shop-overlay');
+    if (el) el.style.display = 'none';
+    // If we got here from the title or game-over screens, those overlays are still shown.
+    // If the game was running, do nothing — return to gameplay.
+}
+
+function buySkin(id) {
+    const skin = getSkin(id);
+    if (!skin || save.owned.includes(id)) return;
+    if (bones < skin.cost) return;
+    bones -= skin.cost;
+    save.bones = bones;
+    save.owned.push(id);
+    writeSave();
+    updateHUD();
+    renderShop();
+}
+
+function equipSkin(id) {
+    if (!save.owned.includes(id)) return;
+    save.equipped = id;
+    writeSave();
+    // Live-swap if a player already exists (e.g. opened shop from game-over)
+    if (typeof player !== 'undefined' && player) player.skin = currentSkin();
+    renderShop();
 }
 
 // ── Collision Logic ───────────────────────────────────────────
@@ -1944,7 +2131,11 @@ function loop(ts = 0) {
 // ── Kick off ──────────────────────────────────────────────────
 generateStars();
 generateClouds();
+// Initialize HUD so the persisted bone wallet is visible on the title screen
+updateHUD();
 
 // Make functions globally accessible
 window.startGame = startGame;
 window.restartGame = restartGame;
+window.openShop = openShop;
+window.closeShop = closeShop;
