@@ -1723,6 +1723,10 @@ function triggerGameOver() {
 
 function triggerWin() {
     gameRunning = false;
+    // Treat a completed run like a finished run for the Shop → PLAY path so that
+    // returning to a fresh game resets score/lives via restartGame() instead of
+    // leaking them via startGame().
+    gameOver = true;
     const ov = document.getElementById('overlay');
     ov.innerHTML = `
         <div class="deco">🏆🦕🎉</div>
