@@ -2,7 +2,9 @@
 
 A vanilla-JS canvas platformer set inside a derelict dino-cloning lab. No build step, no dependencies — just HTML + JS.
 
-Play as a runaway clone fighting through three biome variants — **Sterile Lab**, **Bio-Dome**, and **Hazard Zone** — across 15 sectors with a Prototype boss every 5 sectors.
+**Story.** A late-night cloning run goes wrong and you accidentally print an evil copy of yourself. Before fleeing into the facility, your clone scatters the **clone-machine parts** across the labs and unseals every mutant specimen still in containment. Hunt the parts, put the mutants down, and end your evil twin in the containment vault — or he walks out and takes the world. The intro, two mid-game cutscenes, and a win cutscene tell the story; you can SKIP STORY at any time.
+
+Fight through three biome variants — **Sterile Lab**, **Bio-Dome**, and **Hazard Zone** — across 15 sectors with a boss every 5 sectors. The final boss is your **Evil Clone**.
 
 ## How to run it
 
@@ -39,28 +41,28 @@ Follow the URL it prints (usually http://localhost:3000).
 - **Space / ↑ / W** — Jump (double-jump!)
 - **↓** — Stomp
 
-Collect **🦴 Bones** and **🥚 Specimen Eggs**. Stomp escaped clones to take them out. Reach the **✨ Containment Portal** to advance to the next sector. Boss **Prototype** every 5 sectors:
+Recover **⚙️ Clone Parts** and **🥚 Specimen Eggs**. Stomp **mutants** (the green-glowing creatures roaming the facility) to put them down. Reach the **✨ Containment Portal** to advance to the next sector. Boss every 5 sectors:
 
-| Sector | Biome         | Prototype       |
+| Sector | Biome         | Boss            |
 | ------ | ------------- | --------------- |
 | 5      | Sterile Lab   | Lab Prototype   |
 | 10     | Bio-Dome      | Mutant Hybrid   |
-| 15     | Hazard Zone   | Apex Clone      |
+| 15     | Hazard Zone   | **Evil Clone**  |
 
 ## Clone Lab Shop
 
-Click **🛒 CLONE SHOP** on the title screen or **🛒 GO TO SHOP** on the Game Over screen to spend bones on skins:
+Click **🛒 CLONE SHOP** on the title screen or **🛒 GO TO SHOP** on the Game Over screen to spend Clone Parts on skins:
 
 | Skin            | Cost      |
 | --------------- | --------- |
 | Classic Rex     | Free      |
-| Azure Raptor    | 25 🦴     |
-| Crimson Fang    | 50 🦴     |
-| Golden Tyrant   | 100 🦴    |
-| Shadow Stalker  | 150 🦴    |
-| Prismarex       | 300 🦴 (rainbow) |
+| Azure Raptor    | 25 ⚙️     |
+| Crimson Fang    | 50 ⚙️     |
+| Golden Tyrant   | 100 ⚙️    |
+| Shadow Stalker  | 150 ⚙️    |
+| Prismarex       | 300 ⚙️ (rainbow) |
 
-Bones, owned skins, and the equipped skin persist across runs in `localStorage` (key: `dinoland_save_v1`). Clear that key to reset your progression.
+Clone Parts, owned skins, and the equipped skin persist across runs in `localStorage` (key: `dinoland_save_v1`). Cutscene-seen flags live under `genesislab_cutscenes_seen_v1`. Clear those keys to reset your progression / story.
 
 ## Useful URL tricks
 

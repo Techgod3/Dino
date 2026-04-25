@@ -151,13 +151,140 @@ const THEMES = {
         platformColor: '#6b2222',
         cloudColor: 'rgba(255,140,140,',
         enemyMix: ['raptor','pterodactyl','pterodactyl','triceratops'],
-        bossName: 'Apex Clone',
         bossKind: 'pterodactyl',
-        bossColor: '#ff5577',
+        bossName: 'Evil Clone',
+        bossColor: '#5b0033',
+        bossDarkMirror: true,
     },
 };
 
 const THEME_ORDER = ['lab','dome','hazard'];
+
+// ── Story / Cutscenes ─────────────────────────────────────────
+// Each page: { bg: gradient key, emoji, text }
+const CUTSCENES = {
+    intro: [
+        { bg: 'lab',    emoji: '🧪⚡',   text: 'Cloning Sector 7. 03:41 AM.\nRoutine genome sequencing run, scheduled for tonight.' },
+        { bg: 'flash',  emoji: '💥',     text: 'A power surge tears through the chamber.\nThe synthesizer locks open. Something climbs out.' },
+        { bg: 'lab',    emoji: '😈🧬',   text: 'It looks exactly like you.\nBut it grins. Then it tears the lab apart.' },
+        { bg: 'lab',    emoji: '🔧',     text: 'Before fleeing into the facility,\nit scatters the clone-machine parts across every sector.' },
+        { bg: 'dome',   emoji: '🦖',     text: '...and unseals every mutant specimen still in containment.' },
+        { bg: 'hazard', emoji: '🌍',     text: 'If you don\'t recover the parts and stop the mutants,\nyour evil twin walks out and takes the world.' },
+        { bg: 'hero',   emoji: '🏃',     text: 'Time to clean up your own mess.' },
+    ],
+    sector5: [
+        { bg: 'lab',    emoji: '⚙️',     text: 'Part 1 of 3 recovered.\nThe mutants are pushing harder. Your clone is watching.' },
+    ],
+    sector10: [
+        { bg: 'dome',   emoji: '⚙️⚙️',   text: 'Part 2 of 3 recovered.\nYour clone left these for the strongest mutants. He wants you to fail.' },
+    ],
+    finalApproach: [
+        { bg: 'hazard', emoji: '🩸',     text: 'The final part is in the wrecked containment vault.\nHe\'s waiting for you there.' },
+    ],
+    win: [
+        { bg: 'hazard', emoji: '⚙️⚙️⚙️', text: 'All three parts recovered.\nThe clone machine boots up. Your evil twin... unmade.' },
+        { bg: 'hero',   emoji: '😌',     text: 'Mutants neutralized. Facility quiet.\nYou make a note in the lab log: NEVER AGAIN.' },
+        { bg: 'lab',    emoji: '🤔🧪',   text: '...maybe just one more experiment couldn\'t hurt?' },
+    ],
+};
+
+let cutsceneActive = false;
+let cutscenePages = null;
+let cutsceneIdx = 0;
+let cutsceneCharIdx = 0;
+let cutsceneTickN = 0;
+let cutsceneCallback = null;
+let _cutsceneRaf = null;
+const CUTSCENES_SEEN_KEY = 'genesislab_cutscenes_seen_v1';
+function cutsceneSeen(key) {
+    try {
+        const seen = JSON.parse(localStorage.getItem(CUTSCENES_SEEN_KEY) || '{}');
+        return !!seen[key];
+    } catch (e) { return false; }
+}
+function markCutsceneSeen(key) {
+    try {
+        const seen = JSON.parse(localStorage.getItem(CUTSCENES_SEEN_KEY) || '{}');
+        seen[key] = true;
+        localStorage.setItem(CUTSCENES_SEEN_KEY, JSON.stringify(seen));
+    } catch (e) {}
+}
+
+function playCutscene(pages, onDone, options) {
+    options = options || {};
+    cutscenePages = pages;
+    cutsceneIdx = 0;
+    cutsceneCharIdx = 0;
+    cutsceneTickN = 0;
+    cutsceneActive = true;
+    cutsceneCallback = onDone || null;
+    renderCutsceneFrame();
+    const el = document.getElementById('cutscene-overlay');
+    if (el) el.style.display = 'flex';
+    if (_cutsceneRaf) cancelAnimationFrame(_cutsceneRaf);
+    _cutsceneRaf = requestAnimationFrame(cutsceneLoop);
+}
+
+function cutsceneLoop() {
+    if (!cutsceneActive) return;
+    cutsceneTickN++;
+    const page = cutscenePages[cutsceneIdx];
+    if (page && cutsceneCharIdx < page.text.length && cutsceneTickN % 2 === 0) {
+        cutsceneCharIdx++;
+        const t = document.getElementById('cs-text');
+        if (t) t.textContent = page.text.slice(0, cutsceneCharIdx);
+    }
+    _cutsceneRaf = requestAnimationFrame(cutsceneLoop);
+}
+
+function renderCutsceneFrame() {
+    const el = document.getElementById('cutscene-overlay');
+    if (!el) return;
+    const page = cutscenePages[cutsceneIdx];
+    const last = cutsceneIdx === cutscenePages.length - 1;
+    el.innerHTML = `
+        <div class="cs-bg cs-bg-${page.bg}"></div>
+        <div class="cs-panel">
+            <div class="cs-emoji">${page.emoji}</div>
+            <pre class="cs-text" id="cs-text"></pre>
+            <div class="cs-controls">
+                <button id="cs-skip" class="cs-btn-skip">SKIP STORY ▶▶</button>
+                <button id="cs-next" class="cs-btn-next">${last ? 'BEGIN ▶' : 'NEXT ▶'}</button>
+            </div>
+            <div class="cs-progress">${cutsceneIdx + 1} / ${cutscenePages.length}</div>
+        </div>`;
+    document.getElementById('cs-skip').onclick = endCutscene;
+    document.getElementById('cs-next').onclick = nextCutscenePage;
+    cutsceneCharIdx = 0;
+}
+
+function nextCutscenePage() {
+    const page = cutscenePages[cutsceneIdx];
+    if (cutsceneCharIdx < page.text.length) {
+        // Reveal full text immediately on the first click
+        cutsceneCharIdx = page.text.length;
+        const t = document.getElementById('cs-text');
+        if (t) t.textContent = page.text;
+        return;
+    }
+    cutsceneIdx++;
+    if (cutsceneIdx >= cutscenePages.length) {
+        endCutscene();
+    } else {
+        renderCutsceneFrame();
+    }
+}
+
+function endCutscene() {
+    cutsceneActive = false;
+    if (_cutsceneRaf) cancelAnimationFrame(_cutsceneRaf);
+    _cutsceneRaf = null;
+    const el = document.getElementById('cutscene-overlay');
+    if (el) el.style.display = 'none';
+    const cb = cutsceneCallback;
+    cutsceneCallback = null;
+    if (cb) cb();
+}
 function isBossLevelIdx(i) { return i % BOSS_EVERY === 0; }
 function nonBossPosition(idx) {
     // 1-based position of `idx` in the sequence of non-boss levels
@@ -646,8 +773,38 @@ class Enemy {
         this.frameTimer = 0;
         this.stunTimer = 0;
         this.facing = 1;
+        // Per-instance jitter for mutation effects so they don't all pulse in sync.
+        this._mutSeed = Math.random() * Math.PI * 2;
     }
     get hitbox() { return {x:this.x+4, y:this.y+4, w:this.w-8, h:this.h-8}; }
+    // Pulsing green bioluminescent aura behind the body. Call after ctx.translate
+    // to enemy center, before drawing the body.
+    drawMutationAura() {
+        const t = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+        const pulse = (Math.sin(t / 280 + this._mutSeed) + 1) / 2;
+        const r = Math.max(this.w, this.h) * (0.62 + pulse * 0.10);
+        const aura = ctx.createRadialGradient(0, 4, 4, 0, 4, r);
+        aura.addColorStop(0,   `rgba(140,255,180,${0.40 + pulse * 0.20})`);
+        aura.addColorStop(0.6, 'rgba(120,220,160,0.10)');
+        aura.addColorStop(1,   'rgba(120,220,160,0)');
+        ctx.fillStyle = aura;
+        ctx.beginPath();
+        ctx.arc(0, 4, r, 0, Math.PI*2);
+        ctx.fill();
+    }
+    // Glowing mutation pustules at body offsets. spots: [[x,y,r], ...]
+    drawMutationSpots(spots) {
+        ctx.save();
+        ctx.shadowColor = '#aaff88';
+        ctx.shadowBlur = 8;
+        ctx.fillStyle = '#cfff8a';
+        spots.forEach(([sx, sy, sr]) => {
+            ctx.beginPath();
+            ctx.arc(sx, sy, sr, 0, Math.PI*2);
+            ctx.fill();
+        });
+        ctx.restore();
+    }
 }
 
 class Raptor extends Enemy {
@@ -703,6 +860,8 @@ class Raptor extends Enemy {
         if (!this.alive) return;
         ctx.save();
         ctx.translate(this.x + this.w/2, this.y + this.h/2);
+        // Mutated bioluminescent aura behind the body
+        this.drawMutationAura();
         if (this.facing === -1) ctx.scale(-1, 1);
 
         const bob = Math.sin(this.frame * 1.5) * 1.5;
@@ -820,6 +979,8 @@ class Pterodactyl extends Enemy {
         if (!this.alive) return;
         ctx.save();
         ctx.translate(this.x + this.w/2, this.y + this.h/2);
+        // Mutated bioluminescent aura behind the body
+        this.drawMutationAura();
         if (this.facing === -1) ctx.scale(-1, 1);
 
         const wf = Math.sin(this.wingAngle);
@@ -952,6 +1113,8 @@ class Triceratops extends Enemy {
         if (!this.alive) return;
         ctx.save();
         ctx.translate(this.x + this.w/2, this.y + this.h/2);
+        // Mutated bioluminescent aura behind the body
+        this.drawMutationAura();
         if (this.facing === -1) ctx.scale(-1, 1);
 
         const bob = Math.sin(this.frame * 1.3) * 1;
@@ -1108,9 +1271,17 @@ class Boss {
         const dirToPlayer = (player.x + player.w/2) > (this.x + this.w/2) ? 1 : -1;
         this.facing = dirToPlayer;
 
+        // The arena's full-width ground is always platforms[0] (see generateBossLevel).
+        // Derive its top dynamically so the boss can never end a frame with its feet
+        // below the floor, regardless of vy clamps or fast phase transitions.
+        const ground = platforms && platforms[0] ? platforms[0] : { y: 440 };
+        const groundTop = ground.y;
+
         if (this.kind === 'pterodactyl') {
-            // Flying boss: no gravity; swoops + hovers + shoots
-            const targetY = this.phase === 'swoop' ? player.y - 20 : 160;
+            // Flying boss: no gravity; swoops + hovers + shoots. Y is clamped so
+            // the bottom of its body always stays above the arena floor.
+            const maxY = groundTop - this.h - 12;
+            const targetY = this.phase === 'swoop' ? clamp(player.y - 20, 40, maxY) : 160;
             this.vy += ((targetY - this.y) * 0.004) - this.vy * 0.05;
             this.vx += dirToPlayer * (this.phase === 'swoop' ? 0.25 : 0.08) - this.vx * 0.08;
             this.vx = clamp(this.vx, -5, 5);
@@ -1118,7 +1289,8 @@ class Boss {
             this.x += this.vx;
             this.y += this.vy;
             this.x = clamp(this.x, 0, levelDef.width - this.w);
-            this.y = clamp(this.y, 40, 320);
+            this.y = clamp(this.y, 40, maxY);
+            if (this.y >= maxY) this.vy = Math.min(this.vy, 0);
             // Fire projectiles during 'attack' phase
             if (this.phase === 'attack' && this.phaseTimer % 22 === 0) {
                 this.shoot(player);
@@ -1158,6 +1330,15 @@ class Boss {
             }
             if (this.x < 0) { this.x = 0; this.vx = Math.abs(this.vx); }
             if (this.x + this.w > levelDef.width) { this.x = levelDef.width - this.w; this.vx = -Math.abs(this.vx); }
+
+            // Hard safety net: under no circumstances should the boss end a frame
+            // with its feet below the arena floor. If gravity + a fast phase change
+            // ever slipped it past the per-platform sweep, snap it back up.
+            if (this.y + this.h > groundTop) {
+                this.y = groundTop - this.h;
+                if (this.vy > 0) this.vy = 0;
+                this.onGround = true;
+            }
         }
     }
 
@@ -1366,19 +1547,66 @@ class Collectible {
         ctx.translate(this.x + this.w/2, this.y + this.h/2 + bob);
 
         if (this.type === 'bone') {
-            // Glow
-            ctx.shadowColor = '#ffffaa';
-            ctx.shadowBlur = 8 + glow * 6;
-            // Bone shape
-            ctx.fillStyle = '#f0e68c';
-            ctx.beginPath(); ctx.arc(-6, -3, 5, 0, Math.PI*2); ctx.fill();
-            ctx.beginPath(); ctx.arc(6, -3, 5, 0, Math.PI*2); ctx.fill();
-            ctx.beginPath(); ctx.arc(-6, 4, 5, 0, Math.PI*2); ctx.fill();
-            ctx.beginPath(); ctx.arc(6, 4, 5, 0, Math.PI*2); ctx.fill();
-            ctx.fillRect(-4, -3, 8, 7);
-            // Shine
-            ctx.fillStyle = '#fffff0';
-            ctx.beginPath(); ctx.arc(-5, -4, 1.5, 0, Math.PI*2); ctx.fill();
+            // Clone-machine part — drawn as a proper mechanical cog:
+            // dark outline + steel-gold disk + 6 crisp rectangular teeth + bolt hole.
+            ctx.rotate(this.bobTimer * 0.6);
+
+            // Outer halo glow (kept subtle so the silhouette stays sharp).
+            ctx.shadowColor = '#ffd24a';
+            ctx.shadowBlur = 4 + glow * 4;
+
+            const teethCount = 6;
+            const rDisk = 6.2;
+            const toothLen = 4.2;
+            const toothW = 3.6;
+
+            // Dark outline pass — slightly larger teeth + slightly larger disk.
+            ctx.fillStyle = '#1a1100';
+            for (let i = 0; i < teethCount; i++) {
+                ctx.save();
+                ctx.rotate((i / teethCount) * Math.PI * 2);
+                ctx.fillRect(-(toothW + 1.4) / 2, -(rDisk + toothLen + 0.7), toothW + 1.4, toothLen + 1.4);
+                ctx.restore();
+            }
+            ctx.beginPath();
+            ctx.arc(0, 0, rDisk + 0.8, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Drop the halo before drawing the bright fill so edges stay sharp.
+            ctx.shadowBlur = 0;
+
+            // Brass fill teeth
+            ctx.fillStyle = '#f5c130';
+            for (let i = 0; i < teethCount; i++) {
+                ctx.save();
+                ctx.rotate((i / teethCount) * Math.PI * 2);
+                ctx.fillRect(-toothW / 2, -(rDisk + toothLen), toothW, toothLen + 0.6);
+                ctx.restore();
+            }
+            // Central disk
+            ctx.beginPath();
+            ctx.arc(0, 0, rDisk, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Stepped inner rings for a machined look
+            ctx.fillStyle = '#c08a14';
+            ctx.beginPath();
+            ctx.arc(0, 0, rDisk - 1.4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#8c6210';
+            ctx.beginPath();
+            ctx.arc(0, 0, rDisk - 2.8, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Centre bolt hole
+            ctx.fillStyle = '#100600';
+            ctx.beginPath();
+            ctx.arc(0, 0, 1.7, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Rim highlight on one tooth (sells the metal)
+            ctx.fillStyle = 'rgba(255,245,176,0.9)';
+            ctx.fillRect(-toothW / 2 + 0.2, -(rDisk + toothLen) + 0.2, 1.0, toothLen);
         } else if (this.type === 'egg') {
             // Glow
             ctx.shadowColor = '#aaffaa';
@@ -1727,10 +1955,22 @@ function updateCamera() {
 }
 
 // ── HUD ───────────────────────────────────────────────────────
+const HP_MAX = 5;
 function updateHUD() {
     document.getElementById('score-display').textContent = `Score: ${score}`;
-    document.getElementById('lives-display').textContent = `x${lives}`;
-    document.getElementById('bones-display').textContent = `Bones: ${bones}`;
+    document.getElementById('bones-display').textContent = `Parts: ${bones}`;
+    // HP bar: fill `lives` segments, dim the rest. Pulse red when at 1 HP.
+    const livesEl = document.getElementById('lives-display');
+    if (livesEl) livesEl.textContent = `${Math.max(0, lives)}/${HP_MAX}`;
+    const bar = document.getElementById('hp-bar');
+    if (bar) {
+        const segs = bar.querySelectorAll('.hp-seg');
+        segs.forEach((seg, i) => {
+            if (i < lives) seg.classList.remove('empty');
+            else seg.classList.add('empty');
+        });
+        bar.classList.toggle('danger', lives === 1);
+    }
     // Persist wallet whenever HUD changes (every pickup / damage event)
     save.bones = bones;
     writeSave();
@@ -1766,8 +2006,8 @@ function triggerGameOver() {
     ov.innerHTML = `
         <div class="deco">☠️🧬</div>
         <h1 style="color:#ff4477">SPECIMEN TERMINATED</h1>
-        <div class="subtitle" style="color:#aaffee">Containment failed. Score: ${score}</div>
-        <div class="controls-info">You have <span>${bones} 🦴 bones</span> banked — spend them on new clones in the shop!</div>
+        <div class="subtitle" style="color:#aaffee">The mutants caught up with you. Score: ${score}</div>
+        <div class="controls-info">You have <span>${bones} ⚙️ clone parts</span> banked — spend them on new clones in the shop!</div>
         <div style="display:flex;flex-wrap:wrap;justify-content:center;">
             <button id="retry-btn" style="${BTN_STYLE}">🔄 TRY AGAIN</button>
             <button id="shop-btn-over" style="${SHOP_BTN_STYLE}">🛒 GO TO SHOP</button>
@@ -1784,7 +2024,12 @@ function triggerGameOver() {
 }
 
 function triggerWin() {
+    // Play the outro cutscene first, then show the win overlay.
     gameRunning = false;
+    playCutscene(CUTSCENES.win, _showWinOverlay);
+}
+
+function _showWinOverlay() {
     // Treat a completed run like a finished run for the Shop → PLAY path so that
     // returning to a fresh game resets score/lives via restartGame() instead of
     // leaking them via startGame().
@@ -1792,9 +2037,9 @@ function triggerWin() {
     const ov = document.getElementById('overlay');
     ov.innerHTML = `
         <div class="deco">🏆🧬⚗️</div>
-        <h1 style="color:#ffd700">FACILITY ESCAPED!</h1>
-        <div class="subtitle" style="color:#aaffd6">All clones are free! Final Score: ${score}</div>
-        <div class="controls-info">Bones banked: <span>${bones} 🦴</span> — spend them on new clone skins!</div>
+        <h1 style="color:#ffd700">EVIL CLONE DEFEATED!</h1>
+        <div class="subtitle" style="color:#aaffd6">All three clone parts recovered. World saved. Final Score: ${score}</div>
+        <div class="controls-info">Parts banked: <span>${bones} ⚙️</span> — spend them on new clone skins!</div>
         <div style="display:flex;flex-wrap:wrap;justify-content:center;">
             <button id="retry-btn" style="${BTN_STYLE}">🔄 PLAY AGAIN</button>
             <button id="shop-btn-win" style="${SHOP_BTN_STYLE}">🛒 GO TO SHOP</button>
@@ -1846,6 +2091,45 @@ function startGame() {
     }
 }
 
+// Title-screen entry point: BEGIN ESCAPE.
+// Always plays the intro cutscene before the run starts, so the story is shown
+// every time the player hits BEGIN ESCAPE. SKIP STORY still ends it instantly.
+// The ?level=N (N>1) URL shortcut bypasses it for testing.
+function beginNewGameWithIntro() {
+    const urlLvl = parseInt(new URLSearchParams(location.search).get('level'), 10);
+    const skippingViaUrl = Number.isFinite(urlLvl) && urlLvl >= 1 && urlLvl <= TOTAL_LEVELS && urlLvl !== 1;
+    document.getElementById('overlay').style.display = 'none';
+    const shopEl = document.getElementById('shop-overlay');
+    if (shopEl) shopEl.style.display = 'none';
+    if (skippingViaUrl) {
+        startGame();
+        return;
+    }
+    playCutscene(CUTSCENES.intro, () => {
+        markCutsceneSeen('intro');
+        startGame();
+    });
+}
+
+// Auto-play the opening cutscene on first page load, before the title screen
+// is shown. Subsequent loads (cutsceneSeen('intro') === true) skip straight to
+// the title. Honours the ?level=N shortcut to bypass the cutscene entirely.
+function maybeAutoPlayBootCutscene() {
+    const urlLvl = parseInt(new URLSearchParams(location.search).get('level'), 10);
+    const skippingViaUrl = Number.isFinite(urlLvl) && urlLvl >= 1 && urlLvl <= TOTAL_LEVELS;
+    if (skippingViaUrl) return;
+    if (cutsceneSeen('intro')) return;
+    const titleOverlay = document.getElementById('overlay');
+    if (titleOverlay) titleOverlay.style.display = 'none';
+    // Defer to next frame so the DOM has fully settled before we render.
+    requestAnimationFrame(() => {
+        playCutscene(CUTSCENES.intro, () => {
+            markCutsceneSeen('intro');
+            if (titleOverlay) titleOverlay.style.display = 'flex';
+        });
+    });
+}
+
 // ── Shop ─────────────────────────────────────────────────────
 function renderShop() {
     const el = document.getElementById('shop-overlay');
@@ -1857,8 +2141,8 @@ function renderShop() {
         let btnLabel, btnClass, btnDisabled;
         if (equipped)       { btnLabel = 'EQUIPPED';           btnClass = 'shop-btn equipped'; btnDisabled = true; }
         else if (owned)     { btnLabel = 'EQUIP';              btnClass = 'shop-btn equip';    btnDisabled = false; }
-        else if (affordable){ btnLabel = `BUY · ${s.cost} 🦴`; btnClass = 'shop-btn buy';      btnDisabled = false; }
-        else                { btnLabel = `${s.cost} 🦴`;      btnClass = 'shop-btn locked';   btnDisabled = true; }
+        else if (affordable){ btnLabel = `BUY · ${s.cost} ⚙️`; btnClass = 'shop-btn buy';      btnDisabled = false; }
+        else                { btnLabel = `${s.cost} ⚙️`;      btnClass = 'shop-btn locked';   btnDisabled = true; }
         // Preview swatch: three color circles
         return `
             <div class="skin-card ${equipped ? 'active' : ''}">
@@ -1875,8 +2159,8 @@ function renderShop() {
 
     el.innerHTML = `
         <div class="shop-inner">
-            <h2 class="shop-title">🧬 CLONE LAB SHOP 🦴</h2>
-            <div class="shop-wallet">Wallet: <b>${bones} 🦴</b></div>
+            <h2 class="shop-title">🧬 CLONE LAB SHOP ⚙️</h2>
+            <div class="shop-wallet">Wallet: <b>${bones} ⚙️</b></div>
             <div class="skin-grid">${cards}</div>
             <div class="shop-actions">
                 <button id="shop-play" style="${BTN_STYLE}">${gameOver ? '🔄 TRY AGAIN' : '▶ PLAY'}</button>
@@ -2047,7 +2331,19 @@ function checkCollisions() {
         spawnParticles(player.x + player.w/2, player.y + player.h/2, '#00ffff', 40, 6);
         if (currentLevel < TOTAL_LEVELS) {
             currentLevel++;
-            loadLevel(currentLevel);
+            const csKey = (currentLevel === 6) ? 'sector5'
+                       : (currentLevel === 11) ? 'sector10'
+                       : (currentLevel === 15) ? 'finalApproach'
+                       : null;
+            if (csKey && CUTSCENES[csKey]) {
+                gameRunning = false;
+                playCutscene(CUTSCENES[csKey], () => {
+                    loadLevel(currentLevel);
+                    if (!gameRunning) { gameRunning = true; loop(); }
+                });
+            } else {
+                loadLevel(currentLevel);
+            }
         } else {
             triggerWin();
         }
@@ -2202,6 +2498,10 @@ updateHUD();
 
 // Make functions globally accessible
 window.startGame = startGame;
+window.beginNewGameWithIntro = beginNewGameWithIntro;
 window.restartGame = restartGame;
 window.openShop = openShop;
 window.closeShop = closeShop;
+
+// Auto-play the opening cutscene on first page load, before the title screen.
+maybeAutoPlayBootCutscene();
