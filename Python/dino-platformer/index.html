@@ -203,6 +203,122 @@
         .shop-btn.buy      { background: linear-gradient(135deg,#00d4aa,#006e58); }
         .shop-btn.locked   { background: #222; border-color: #555; color: #888; cursor: not-allowed; }
         .shop-actions { margin-top: 10px; }
+
+        /* ── Cutscene overlay ─────────────────────────────────────── */
+        #cutscene-overlay {
+            position: absolute;
+            top: 44px;
+            left: 0;
+            width: 900px;
+            height: 500px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            border-radius: 0 0 8px 8px;
+            z-index: 50;
+            font-family: 'Courier New', monospace;
+            color: #fff;
+            overflow: hidden;
+        }
+        .cs-bg {
+            position: absolute;
+            inset: 0;
+            background-size: cover;
+            background-position: center;
+            animation: cs-pan 14s linear infinite alternate;
+        }
+        @keyframes cs-pan {
+            0%   { transform: scale(1.0)   translateX(0); }
+            100% { transform: scale(1.06)  translateX(-12px); }
+        }
+        @keyframes cs-flash {
+            0%, 100% { opacity: 1; }
+            50%      { opacity: 0.55; }
+        }
+        .cs-bg-lab {
+            background:
+                radial-gradient(circle at 30% 40%, rgba(0,255,200,0.30) 0%, transparent 55%),
+                radial-gradient(circle at 70% 70%, rgba(0,140,180,0.45) 0%, transparent 60%),
+                linear-gradient(180deg, #02161e 0%, #03242c 100%);
+        }
+        .cs-bg-flash {
+            background:
+                radial-gradient(circle at 50% 50%, rgba(255,255,200,0.85) 0%, rgba(255,80,80,0.5) 30%, transparent 70%),
+                linear-gradient(180deg, #2a0010 0%, #4a0020 100%);
+            animation: cs-flash 0.6s ease-in-out infinite, cs-pan 14s linear infinite alternate;
+        }
+        .cs-bg-dome {
+            background:
+                radial-gradient(circle at 35% 60%, rgba(80,255,160,0.35) 0%, transparent 55%),
+                radial-gradient(circle at 70% 30%, rgba(20,120,70,0.55) 0%, transparent 60%),
+                linear-gradient(180deg, #001b12 0%, #003322 100%);
+        }
+        .cs-bg-hazard {
+            background:
+                radial-gradient(circle at 60% 50%, rgba(255,60,60,0.45) 0%, transparent 60%),
+                radial-gradient(circle at 25% 70%, rgba(180,30,30,0.55) 0%, transparent 60%),
+                linear-gradient(180deg, #1a0008 0%, #3d0011 100%);
+        }
+        .cs-bg-hero {
+            background:
+                radial-gradient(circle at 50% 40%, rgba(255,215,80,0.30) 0%, transparent 55%),
+                linear-gradient(180deg, #050a18 0%, #0a1a2e 100%);
+        }
+        .cs-panel {
+            position: relative;
+            z-index: 2;
+            width: 700px;
+            background: rgba(0,0,0,0.65);
+            border: 2px solid #00d4aa;
+            border-radius: 12px;
+            padding: 22px 30px 18px;
+            text-align: center;
+            box-shadow: 0 0 40px rgba(0,212,170,0.35);
+        }
+        .cs-emoji {
+            font-size: 56px;
+            margin-bottom: 10px;
+            filter: drop-shadow(0 2px 12px rgba(0,255,200,0.55));
+        }
+        .cs-text {
+            color: #e6fff8;
+            font-size: 18px;
+            line-height: 1.5;
+            min-height: 84px;
+            white-space: pre-wrap;
+            text-align: center;
+            margin: 0 auto 14px;
+            font-family: 'Courier New', monospace;
+        }
+        .cs-controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 8px;
+        }
+        .cs-btn-skip, .cs-btn-next {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            font-size: 14px;
+            padding: 8px 18px;
+            border-radius: 6px;
+            cursor: pointer;
+            letter-spacing: 1px;
+            border: 2px solid;
+            color: #fff;
+        }
+        .cs-btn-skip { background: rgba(60,60,80,0.7); border-color: #777; }
+        .cs-btn-skip:hover { background: rgba(90,90,110,0.85); }
+        .cs-btn-next { background: linear-gradient(135deg,#00d4aa,#006e58); border-color: #ffd700; }
+        .cs-btn-next:hover { background: linear-gradient(135deg,#1ee6c0,#00aa88); }
+        .cs-progress {
+            position: absolute;
+            top: 8px;
+            right: 14px;
+            color: #88aaaa;
+            font-size: 12px;
+            letter-spacing: 1px;
+        }
     </style>
 <script src="https://sites.super.myninja.ai/_assets/ninja-daytona-script.js"></script>
 </head>
@@ -210,7 +326,7 @@
 <div id="game-wrapper">
     <div id="hud">
         <div class="hud-item"><span>🧬</span> <span>Genesis Lab</span></div>
-        <div class="hud-item"><span>🦴</span> <span id="bones-display">Bones: 0</span></div>
+        <div class="hud-item"><span>⚙️</span> <span id="bones-display">Parts: 0</span></div>
         <div class="hud-item"><span>⭐</span> <span id="score-display">Score: 0</span></div>
         <div class="hud-item"><span>❤️</span> <span id="lives-display">x5</span></div>
         <div class="hud-item"><span>🧪</span> <span id="level-display">Sector 1</span></div>
@@ -219,11 +335,11 @@
     <div id="overlay">
         <div class="deco">🧬🦖⚗️</div>
         <h1>GENESIS LAB</h1>
-        <div class="subtitle">Escape the cloning facility</div>
+        <div class="subtitle">Hunt down your evil clone. Recover the parts. Stop the mutants.</div>
         <div class="controls-info">
             <span>← →</span> Move &nbsp;|&nbsp; <span>SPACE / ↑</span> Jump (double jump!) &nbsp;|&nbsp; <span>↓</span> Stomp<br>
-            Collect <span>🦴 Bones</span> and <span>🥚 Specimen Eggs</span> | Stomp escaped clones to defeat them<br>
-            Reach the <span>✨ Containment Portal</span> to advance | Prototype every 5 sectors!
+            Recover <span>⚙️ Clone Parts</span> and <span>🥚 Specimen Eggs</span> | Stomp <span>mutants</span> to put them down<br>
+            Reach the <span>✨ Containment Portal</span> to advance | Boss fight every 5 sectors!
         </div>
         <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:10px;">
             <button id="start-btn">&#9654; BEGIN ESCAPE</button>
@@ -231,6 +347,7 @@
         </div>
     </div>
     <div id="shop-overlay"></div>
+    <div id="cutscene-overlay"></div>
     <div id="message-box">
         <h2 id="msg-title"></h2>
         <p id="msg-body"></p>
@@ -241,7 +358,8 @@
 <script>
     // Wire up title-screen buttons after everything is loaded
     document.getElementById('start-btn').addEventListener('click', function() {
-        if (window.startGame) window.startGame();
+        if (window.beginNewGameWithIntro) window.beginNewGameWithIntro();
+        else if (window.startGame) window.startGame();
     });
     document.getElementById('shop-btn').addEventListener('click', function() {
         if (window.openShop) window.openShop();
