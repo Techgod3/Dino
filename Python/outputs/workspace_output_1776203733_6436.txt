@@ -1,5 +1,0 @@
-97:        #start-btn {
-112:        #start-btn:hover {
-135:<script src="https://sites.super.myninja.ai/_assets/ninja-daytona-script.js"></script>
-156:        <button id="start-btn" onclick="startGame()">▶ PLAY NOW</button>
-164:<script src="game.js"></script>

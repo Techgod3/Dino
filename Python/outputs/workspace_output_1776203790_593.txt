@@ -1,8 +1,0 @@
-
-// ── Kick off ──────────────────────────────────────────────────
-generateStars();
-generateClouds();
-
-// Make functions globally accessible
-window.startGame = startGame;
-window.restartGame = restartGame;

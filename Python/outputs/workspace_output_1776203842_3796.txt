@@ -1,9 +1,0 @@
-322:            triggerGameOver();
-1242:function triggerGameOver() {
-1251:        <button id="start-btn" onclick="restartGame()">🔄 TRY AGAIN</button>
-1256:function triggerWin() {
-1264:        <button id="start-btn" onclick="restartGame()">🔄 PLAY AGAIN</button>
-1269:function restartGame() {
-1336:                    triggerGameOver();
-1355:            setTimeout(triggerWin, 500);
-1417:window.restartGame = restartGame;
