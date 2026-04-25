@@ -1271,9 +1271,17 @@ class Boss {
         const dirToPlayer = (player.x + player.w/2) > (this.x + this.w/2) ? 1 : -1;
         this.facing = dirToPlayer;
 
+        // The arena's full-width ground is always platforms[0] (see generateBossLevel).
+        // Derive its top dynamically so the boss can never end a frame with its feet
+        // below the floor, regardless of vy clamps or fast phase transitions.
+        const ground = platforms && platforms[0] ? platforms[0] : { y: 440 };
+        const groundTop = ground.y;
+
         if (this.kind === 'pterodactyl') {
-            // Flying boss: no gravity; swoops + hovers + shoots
-            const targetY = this.phase === 'swoop' ? player.y - 20 : 160;
+            // Flying boss: no gravity; swoops + hovers + shoots. Y is clamped so
+            // the bottom of its body always stays above the arena floor.
+            const maxY = groundTop - this.h - 12;
+            const targetY = this.phase === 'swoop' ? clamp(player.y - 20, 40, maxY) : 160;
             this.vy += ((targetY - this.y) * 0.004) - this.vy * 0.05;
             this.vx += dirToPlayer * (this.phase === 'swoop' ? 0.25 : 0.08) - this.vx * 0.08;
             this.vx = clamp(this.vx, -5, 5);
@@ -1281,7 +1289,8 @@ class Boss {
             this.x += this.vx;
             this.y += this.vy;
             this.x = clamp(this.x, 0, levelDef.width - this.w);
-            this.y = clamp(this.y, 40, 320);
+            this.y = clamp(this.y, 40, maxY);
+            if (this.y >= maxY) this.vy = Math.min(this.vy, 0);
             // Fire projectiles during 'attack' phase
             if (this.phase === 'attack' && this.phaseTimer % 22 === 0) {
                 this.shoot(player);
@@ -1321,6 +1330,15 @@ class Boss {
             }
             if (this.x < 0) { this.x = 0; this.vx = Math.abs(this.vx); }
             if (this.x + this.w > levelDef.width) { this.x = levelDef.width - this.w; this.vx = -Math.abs(this.vx); }
+
+            // Hard safety net: under no circumstances should the boss end a frame
+            // with its feet below the arena floor. If gravity + a fast phase change
+            // ever slipped it past the per-platform sweep, snap it back up.
+            if (this.y + this.h > groundTop) {
+                this.y = groundTop - this.h;
+                if (this.vy > 0) this.vy = 0;
+                this.onGround = true;
+            }
         }
     }
 
@@ -1937,10 +1955,22 @@ function updateCamera() {
 }
 
 // ── HUD ───────────────────────────────────────────────────────
+const HP_MAX = 5;
 function updateHUD() {
     document.getElementById('score-display').textContent = `Score: ${score}`;
-    document.getElementById('lives-display').textContent = `x${lives}`;
     document.getElementById('bones-display').textContent = `Parts: ${bones}`;
+    // HP bar: fill `lives` segments, dim the rest. Pulse red when at 1 HP.
+    const livesEl = document.getElementById('lives-display');
+    if (livesEl) livesEl.textContent = `${Math.max(0, lives)}/${HP_MAX}`;
+    const bar = document.getElementById('hp-bar');
+    if (bar) {
+        const segs = bar.querySelectorAll('.hp-seg');
+        segs.forEach((seg, i) => {
+            if (i < lives) seg.classList.remove('empty');
+            else seg.classList.add('empty');
+        });
+        bar.classList.toggle('danger', lives === 1);
+    }
     // Persist wallet whenever HUD changes (every pickup / damage event)
     save.bones = bones;
     writeSave();
@@ -2062,17 +2092,16 @@ function startGame() {
 }
 
 // Title-screen entry point: BEGIN ESCAPE.
-// The intro auto-plays on page load (see bottom of file), so once the player
-// has watched it we go straight into the game on click. If somehow the intro
-// hasn't been seen yet (e.g. they hit the button while the boot cutscene is
-// still up), we replay it before starting.
+// Always plays the intro cutscene before the run starts, so the story is shown
+// every time the player hits BEGIN ESCAPE. SKIP STORY still ends it instantly.
+// The ?level=N (N>1) URL shortcut bypasses it for testing.
 function beginNewGameWithIntro() {
     const urlLvl = parseInt(new URLSearchParams(location.search).get('level'), 10);
     const skippingViaUrl = Number.isFinite(urlLvl) && urlLvl >= 1 && urlLvl <= TOTAL_LEVELS && urlLvl !== 1;
     document.getElementById('overlay').style.display = 'none';
     const shopEl = document.getElementById('shop-overlay');
     if (shopEl) shopEl.style.display = 'none';
-    if (skippingViaUrl || cutsceneSeen('intro')) {
+    if (skippingViaUrl) {
         startGame();
         return;
     }
