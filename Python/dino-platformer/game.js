@@ -165,7 +165,7 @@ function nonBossPosition(idx) {
 }
 function themeKeyForLevel(idx) {
     // Boss levels inherit the theme of the non-boss level immediately before them,
-    // so a run through lava -> jungle -> volcano -> lava -> BOSS gives a lava boss, etc.
+    // so a run through lab -> dome -> hazard -> lab -> BOSS gives a lab boss, etc.
     const refIdx = isBossLevelIdx(idx) ? idx - 1 : idx;
     const pos = nonBossPosition(refIdx); // 1..N
     return THEME_ORDER[(pos - 1) % THEME_ORDER.length];
@@ -1059,11 +1059,11 @@ class Triceratops extends Enemy {
 
 // ── Boss ──────────────────────────────────────────────────────
 // A much larger themed creature with HP, attack phases, contact damage,
-// and ranged attacks on volcano theme. Stomp to damage (brief i-frames after hit).
+// and ranged attacks on the hazard theme. Stomp to damage (brief i-frames after hit).
 class Boss {
     constructor(def) {
         this.kind = def.kind;         // 'raptor' | 'triceratops' | 'pterodactyl'
-        this.themeKey = def.themeKey; // 'lava' | 'jungle' | 'volcano'
+        this.themeKey = def.themeKey; // 'lab' | 'dome' | 'hazard'
         this.name = def.name;
         this.color = def.color;
         this.x = def.x; this.y = def.y;
@@ -1169,7 +1169,7 @@ class Boss {
         const dx = tx - cx, dy = ty - cy;
         const len = Math.max(1, Math.hypot(dx, dy));
         const speed = 5.5;
-        const kind = this.themeKey; // 'lava'|'jungle'|'volcano'
+        const kind = this.themeKey; // 'lab'|'dome'|'hazard'
         bossProjectiles.push({
             x: cx, y: cy,
             vx: (dx / len) * speed,
@@ -2061,8 +2061,8 @@ function updateBossProjectiles() {
         p.x += p.vx;
         p.y += p.vy;
         p.life--;
-        // Slight gravity for lava/jungle projectiles; volcano ones fly straight
-        if (p.kind !== 'volcano') p.vy += 0.12;
+        // Slight gravity for lab/dome projectiles; hazard ones fly straight
+        if (p.kind !== 'hazard') p.vy += 0.12;
         if (p.y > H - 40 || p.x < 0 || p.x > levelDef.width || p.life <= 0) p.dead = true;
     });
     bossProjectiles = bossProjectiles.filter(p => !p.dead);
@@ -2073,8 +2073,8 @@ function drawBossProjectiles() {
         ctx.save();
         ctx.translate(p.x, p.y);
         let color = '#ff5500', glow = '#ff8800';
-        if (p.kind === 'jungle')      { color = '#4caf50'; glow = '#aaff77'; }
-        else if (p.kind === 'volcano'){ color = '#aa00ff'; glow = '#ff33ff'; }
+        if (p.kind === 'dome')        { color = '#4caf50'; glow = '#aaff77'; }
+        else if (p.kind === 'hazard') { color = '#aa00ff'; glow = '#ff33ff'; }
         ctx.shadowColor = glow;
         ctx.shadowBlur = 14;
         ctx.fillStyle = color;
