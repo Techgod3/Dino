@@ -1,5 +1,5 @@
 // ============================================================
-//  DINOLAND - Prehistoric Platformer
+//  GENESIS LAB - Cloning Facility Escape
 //  Full game engine in vanilla JS + Canvas
 // ============================================================
 
@@ -9,12 +9,62 @@ const W = canvas.width;
 const H = canvas.height;
 
 // ── Global State ─────────────────────────────────────────────
-let score = 0, lives = 3, bones = 0, currentLevel = 1;
+const TOTAL_LEVELS = 15;
+const BOSS_EVERY = 5; // boss fight every Nth level
+let score = 0, lives = 5, bones = 0, currentLevel = 1;
 let gameRunning = false, gameOver = false;
 let keys = {};
 let particles = [];
 let clouds = [];
 let bgStars = [];
+let camera = {x: 0, y: 0};
+let boss = null;           // active boss instance on boss levels
+let bossProjectiles = [];  // fire / spike / vine projectiles
+
+// ── Skin / Shop System ───────────────────────────────────────
+// Each skin is a palette swap of the dino. "rainbow" is special: cycles hue over time.
+const SKINS = [
+    { id: 'classic', name: 'Classic Rex',  emoji: '🦖', cost: 0,
+      mid: '#3aaa3a', dark: '#2d8a2d', darker: '#1a6b1a', belly: '#90ee90' },
+    { id: 'azure',   name: 'Azure Raptor', emoji: '🔷', cost: 25,
+      mid: '#3a8aee', dark: '#2d6fc9', darker: '#1a4a8a', belly: '#aac4f0' },
+    { id: 'crimson', name: 'Crimson Fang', emoji: '🔥', cost: 50,
+      mid: '#ee3a3a', dark: '#c92d2d', darker: '#8a1a1a', belly: '#f0aaaa' },
+    { id: 'golden',  name: 'Golden Tyrant',emoji: '⭐', cost: 100,
+      mid: '#ffd700', dark: '#cfa800', darker: '#8a6f00', belly: '#fff0aa' },
+    { id: 'shadow',  name: 'Shadow Stalker',emoji: '🌑', cost: 150,
+      mid: '#4a4a55', dark: '#2a2a33', darker: '#111',    belly: '#8a8a99' },
+    { id: 'rainbow', name: 'Prismarex',    emoji: '🌈', cost: 300,
+      mid: '#ff00ff', dark: '#cc00cc', darker: '#880088', belly: '#ffccff', rainbow: true },
+];
+
+const SAVE_KEY = 'dinoland_save_v1';
+function defaultSave() {
+    return { bones: 0, owned: ['classic'], equipped: 'classic' };
+}
+let save = defaultSave();
+
+function loadSave() {
+    try {
+        const raw = localStorage.getItem(SAVE_KEY);
+        if (!raw) { save = defaultSave(); return; }
+        const data = JSON.parse(raw);
+        save = {
+            bones: Math.max(0, parseInt(data.bones, 10) || 0),
+            owned: Array.isArray(data.owned) && data.owned.length ? data.owned : ['classic'],
+            equipped: typeof data.equipped === 'string' ? data.equipped : 'classic',
+        };
+        if (!save.owned.includes('classic')) save.owned.push('classic');
+        if (!save.owned.includes(save.equipped)) save.equipped = 'classic';
+    } catch (_) { save = defaultSave(); }
+}
+function writeSave() {
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (_) {}
+}
+function getSkin(id) { return SKINS.find(s => s.id === id) || SKINS[0]; }
+function currentSkin() { return getSkin(save.equipped); }
+loadSave();
+bones = save.bones; // wallet persists across runs
 
 // ── Input ─────────────────────────────────────────────────────
 window.addEventListener('keydown', e => {
@@ -67,131 +117,212 @@ function drawParticles() {
     });
 }
 
-// ── Level Definitions ─────────────────────────────────────────
-const LEVELS = [
-    {
-        name: "Lava Valley",
-        bgColors: ['#1a0a2e', '#2d0a00', '#1a1500'],
-        groundColor: '#5c3317',
-        platformColor: '#7a4a20',
-        platforms: [
-            {x:0,   y:440, w:900, h:60},   // ground
-            {x:100, y:360, w:120, h:18},
-            {x:280, y:300, w:100, h:18},
-            {x:420, y:340, w:130, h:18},
-            {x:580, y:270, w:110, h:18},
-            {x:710, y:310, w:140, h:18},
-            {x:200, y:220, w:100, h:18},
-            {x:480, y:190, w:120, h:18},
-            {x:650, y:180, w:100, h:18},
-        ],
-        enemies: [
-            {type:'raptor', x:320, y:400},
-            {type:'raptor', x:560, y:400},
-            {type:'pterodactyl', x:420, y:200, range:150},
-            {type:'raptor', x:720, y:270},
-        ],
-        collectibles: [
-            {type:'bone', x:130, y:335},
-            {type:'bone', x:305, y:275},
-            {type:'egg',  x:455, y:315},
-            {type:'bone', x:615, y:245},
-            {type:'bone', x:735, y:285},
-            {type:'egg',  x:220, y:195},
-            {type:'bone', x:510, y:165},
-            {type:'egg',  x:670, y:155},
-        ],
-        portal: {x:820, y:280},
-        playerStart: {x:50, y:380},
+// ── Level Themes (Cloning Facility) ───────────────────────────
+const THEMES = {
+    lab: {
+        name: "Sterile Lab",
+        style: 'lab',
+        bgColors: ['#04111a', '#082030', '#02060a'],
+        groundColor: '#36404a',
+        platformColor: '#4a5560',
+        cloudColor: 'rgba(180,255,230,',
+        enemyMix: ['raptor','raptor','pterodactyl','triceratops'],
+        bossName: 'Lab Prototype',
+        bossKind: 'triceratops',
+        bossColor: '#bcdce6',
     },
-    {
-        name: "Jungle Canopy",
-        bgColors: ['#001a00', '#003300', '#001100'],
-        groundColor: '#2d4a1e',
-        platformColor: '#3a6b22',
-        platforms: [
-            {x:0,   y:440, w:900, h:60},
-            {x:60,  y:360, w:100, h:18},
-            {x:220, y:310, w:80,  h:18},
-            {x:360, y:260, w:110, h:18},
-            {x:500, y:340, w:90,  h:18},
-            {x:640, y:290, w:120, h:18},
-            {x:760, y:230, w:100, h:18},
-            {x:130, y:240, w:100, h:18},
-            {x:290, y:180, w:80,  h:18},
-            {x:450, y:160, w:100, h:18},
-            {x:590, y:200, w:90,  h:18},
-        ],
-        enemies: [
-            {type:'raptor', x:200, y:400},
-            {type:'pterodactyl', x:350, y:150, range:180},
-            {type:'raptor', x:510, y:400},
-            {type:'pterodactyl', x:650, y:170, range:120},
-            {type:'raptor', x:780, y:190},
-            {type:'triceratops', x:420, y:400},
-        ],
-        collectibles: [
-            {type:'bone', x:80,  y:335},
-            {type:'egg',  x:245, y:285},
-            {type:'bone', x:385, y:235},
-            {type:'bone', x:525, y:315},
-            {type:'egg',  x:660, y:265},
-            {type:'bone', x:790, y:205},
-            {type:'bone', x:155, y:215},
-            {type:'egg',  x:315, y:155},
-            {type:'bone', x:475, y:135},
-        ],
-        portal: {x:820, y:195},
-        playerStart: {x:50, y:380},
+    dome: {
+        name: "Bio-Dome",
+        style: 'dome',
+        bgColors: ['#001a14', '#003322', '#001911'],
+        groundColor: '#1e3d2a',
+        platformColor: '#2f5a3a',
+        cloudColor: 'rgba(140,255,180,',
+        enemyMix: ['raptor','pterodactyl','raptor','triceratops','pterodactyl'],
+        bossName: 'Mutant Hybrid',
+        bossKind: 'raptor',
+        bossColor: '#5fff7f',
     },
+    hazard: {
+        name: "Hazard Zone",
+        style: 'hazard',
+        bgColors: ['#1a0008', '#3d0011', '#1a0500'],
+        groundColor: '#4a1a1a',
+        platformColor: '#6b2222',
+        cloudColor: 'rgba(255,140,140,',
+        enemyMix: ['raptor','pterodactyl','pterodactyl','triceratops'],
+        bossName: 'Apex Clone',
+        bossKind: 'pterodactyl',
+        bossColor: '#ff5577',
+    },
+};
+
+const THEME_ORDER = ['lab','dome','hazard'];
+function isBossLevelIdx(i) { return i % BOSS_EVERY === 0; }
+function nonBossPosition(idx) {
+    // 1-based position of `idx` in the sequence of non-boss levels
+    return idx - Math.floor(idx / BOSS_EVERY);
+}
+function themeKeyForLevel(idx) {
+    // Boss levels inherit the theme of the non-boss level immediately before them,
+    // so a run through lab -> dome -> hazard -> lab -> BOSS gives a lab boss, etc.
+    const refIdx = isBossLevelIdx(idx) ? idx - 1 : idx;
+    const pos = nonBossPosition(refIdx); // 1..N
+    return THEME_ORDER[(pos - 1) % THEME_ORDER.length];
+}
+function isBossLevel(idx) { return idx % BOSS_EVERY === 0; }
+
+// ── Procedural Level Generator ────────────────────────────────
+function generateLevel(idx) {
+    if (isBossLevel(idx)) return generateBossLevel(idx);
+
+    const theme = THEMES[themeKeyForLevel(idx)];
+    // Each level longer than the last (capped).
+    const width = Math.min(2400 + idx * 140, 4800);
+
+    // ── Ground: mostly continuous, with occasional gaps to jump over ──
+    const platforms = [];
     {
-        name: "Volcanic Summit",
-        bgColors: ['#1a0000', '#3d0000', '#1a0800'],
-        groundColor: '#4a1a00',
-        platformColor: '#6b2200',
-        platforms: [
-            {x:0,   y:440, w:300, h:60},
-            {x:350, y:440, w:200, h:60},
-            {x:600, y:440, w:300, h:60},
-            {x:80,  y:360, w:100, h:18},
-            {x:240, y:300, w:100, h:18},
-            {x:400, y:350, w:80,  h:18},
-            {x:520, y:290, w:120, h:18},
-            {x:680, y:330, w:100, h:18},
-            {x:160, y:230, w:90,  h:18},
-            {x:340, y:200, w:80,  h:18},
-            {x:500, y:220, w:100, h:18},
-            {x:660, y:250, w:90,  h:18},
-            {x:750, y:180, w:100, h:18},
-            {x:380, y:140, w:120, h:18},
-        ],
-        enemies: [
-            {type:'raptor', x:100, y:400},
-            {type:'triceratops', x:450, y:400},
-            {type:'raptor', x:700, y:400},
-            {type:'pterodactyl', x:280, y:170, range:200},
-            {type:'pterodactyl', x:550, y:180, range:150},
-            {type:'raptor', x:270, y:270},
-            {type:'raptor', x:540, y:255},
-            {type:'triceratops', x:380, y:110},
-        ],
-        collectibles: [
-            {type:'egg',  x:105, y:335},
-            {type:'bone', x:265, y:275},
-            {type:'bone', x:425, y:325},
-            {type:'egg',  x:545, y:265},
-            {type:'bone', x:705, y:305},
-            {type:'bone', x:185, y:205},
-            {type:'egg',  x:360, y:175},
-            {type:'bone', x:525, y:195},
-            {type:'egg',  x:685, y:225},
-            {type:'bone', x:775, y:155},
-            {type:'egg',  x:405, y:115},
-        ],
-        portal: {x:820, y:340},
-        playerStart: {x:40, y:380},
+        let x = 0;
+        while (x < width) {
+            // First/last ground sections are always solid (safe start + safe portal area)
+            const canGap = x > 320 && x < width - 400 && Math.random() < 0.28;
+            if (canGap) {
+                const gap = randInt(70, 130);
+                x += gap;
+                if (x >= width) break;
+            }
+            const len = randInt(220, 520);
+            const segW = Math.min(len, width - x);
+            platforms.push({x: x, y: 440, w: segW, h: 60});
+            x += segW;
+        }
     }
-];
+
+    // ── Floating platforms (2 rough altitude bands) ──
+    const bandLow = {min: 300, max: 380};
+    const bandHigh = {min: 150, max: 250};
+    const floatCount = Math.floor(width / 180);
+    const floatPlats = [];
+    for (let i = 0; i < floatCount; i++) {
+        const band = Math.random() < 0.55 ? bandLow : bandHigh;
+        const pw = randInt(90, 160);
+        const px = clamp(80 + (i * (width - 200) / floatCount) + rand(-40, 40), 40, width - pw - 40);
+        const py = Math.round(rand(band.min, band.max));
+        // Avoid stacking directly over another float platform
+        if (floatPlats.some(q => Math.abs(q.x - px) < 40 && Math.abs(q.y - py) < 40)) continue;
+        floatPlats.push({x: px, y: py, w: pw, h: 18});
+    }
+    platforms.push(...floatPlats);
+
+    // ── Enemies (more as levels progress) ──
+    const enemies = [];
+    const enemyCount = Math.floor(width / 340) + Math.floor(idx / 3);
+    for (let i = 0; i < enemyCount; i++) {
+        const type = theme.enemyMix[randInt(0, theme.enemyMix.length - 1)];
+        if (type === 'pterodactyl') {
+            const ex = rand(300, width - 200);
+            enemies.push({type, x: ex, y: rand(90, 220), range: randInt(110, 220)});
+        } else {
+            // Ground patrollers - place on a random ground segment
+            const grounds = platforms.filter(p => p.y === 440 && p.w > 140);
+            const g = grounds[randInt(0, grounds.length - 1)];
+            const ex = rand(g.x + 40, g.x + g.w - 80);
+            enemies.push({type, x: ex, y: 400});
+        }
+    }
+
+    // ── Collectibles: one above most floating platforms, plus ground trail ──
+    const collectibles = [];
+    floatPlats.forEach(p => {
+        if (Math.random() < 0.8) {
+            collectibles.push({
+                type: Math.random() < 0.75 ? 'bone' : 'egg',
+                x: p.x + p.w / 2 - 10,
+                y: p.y - 26,
+            });
+        }
+    });
+    // Ground-level bones scattered as a breadcrumb trail
+    const groundBones = Math.floor(width / 220);
+    for (let i = 0; i < groundBones; i++) {
+        collectibles.push({
+            type: 'bone',
+            x: 120 + i * (width - 240) / groundBones + rand(-30, 30),
+            y: 408,
+        });
+    }
+
+    // ── Random portal: pick a random floating platform in the last 30% ──
+    const portalCandidates = floatPlats.filter(p => p.x + p.w > width * 0.65);
+    let portalPos;
+    if (portalCandidates.length > 0) {
+        const p = portalCandidates[randInt(0, portalCandidates.length - 1)];
+        portalPos = {x: p.x + p.w / 2 - 22, y: p.y - 62};
+    } else {
+        // Fallback: on ground near the end
+        portalPos = {x: width - 100, y: 380};
+    }
+
+    return {
+        name: `${theme.name} ${idx}`,
+        theme: theme,
+        bgColors: theme.bgColors,
+        groundColor: theme.groundColor,
+        platformColor: theme.platformColor,
+        width,
+        platforms,
+        enemies,
+        collectibles,
+        portal: portalPos,
+        playerStart: {x: 50, y: 380},
+        isBoss: false,
+        idx,
+    };
+}
+
+function generateBossLevel(idx) {
+    const theme = THEMES[themeKeyForLevel(idx)];
+    const width = 1400;
+    // Arena: solid ground + symmetric platforms for dodging
+    const platforms = [
+        {x: 0,    y: 440, w: width, h: 60},
+        {x: 120,  y: 340, w: 140,   h: 18},
+        {x: width - 260, y: 340, w: 140, h: 18},
+        {x: width / 2 - 80, y: 250, w: 160, h: 18},
+        {x: 330,  y: 180, w: 120, h: 18},
+        {x: width - 450, y: 180, w: 120, h: 18},
+    ];
+    const bossDef = {
+        kind: theme.bossKind,
+        name: theme.bossName,
+        color: theme.bossColor,
+        hp: 4 + Math.floor(idx / BOSS_EVERY) * 2, // bosses get tougher
+        themeKey: themeKeyForLevel(idx),
+        x: width / 2 - 55,
+        y: 290,
+    };
+    return {
+        name: `BOSS: ${theme.bossName}`,
+        theme: theme,
+        bgColors: theme.bgColors,
+        groundColor: theme.groundColor,
+        platformColor: theme.platformColor,
+        width,
+        platforms,
+        enemies: [],
+        collectibles: [
+            {type: 'bone', x: 200, y: 408},
+            {type: 'bone', x: width - 220, y: 408},
+        ],
+        boss: bossDef,
+        // portal spawned dynamically after boss defeated (center of arena)
+        portal: null,
+        playerStart: {x: 50, y: 380},
+        isBoss: true,
+        idx,
+    };
+}
 
 // ── Player ────────────────────────────────────────────────────
 class Player {
@@ -211,6 +342,9 @@ class Player {
         this.invincible = 0;
         this.stompCooldown = 0;
         this.tailWag = 0;
+        // Palette swap via equipped shop skin
+        this.skin = currentSkin();
+        this.skinTime = 0; // used by rainbow skin
     }
 
     update(platforms) {
@@ -252,7 +386,7 @@ class Player {
 
         // Move X
         this.x += this.vx;
-        this.x = clamp(this.x, 0, W - this.w);
+        this.x = clamp(this.x, 0, (levelDef ? levelDef.width : W) - this.w);
 
         // Platform collision X (basic)
         // Move Y
@@ -318,10 +452,17 @@ class Player {
         spawnParticles(this.x + this.w/2, this.y + this.h/2, '#ff4444', 15, 5);
         lives--;
         updateHUD();
+        // Respawn at the nearest ground-platform checkpoint so we don't chain-die in gaps
+        const candidates = (platforms || []).filter(p => p.y === 440 && p.x + p.w > this.x - 60);
+        const cp = candidates.length ? candidates[0] : {x: 50, y: 380};
+        this.x = clamp(cp.x + 40, 20, levelDef.width - this.w - 20);
+        this.y = (cp.y || 440) - this.h - 10;
+        this.vx = 0; this.vy = 0;
+        this.invincible = 90;
         if (lives <= 0) {
             triggerGameOver();
         } else {
-            showMessage('💀 OUCH!', 'You lost a life! Press SPACE to continue...', true);
+            showMessage('⚠️ SPECIMEN HIT!', 'Vitals dropping — keep moving!', false);
         }
     }
 
@@ -339,6 +480,21 @@ class Player {
         const idleBob = this.state === 'idle' ? Math.sin(this.tailWag * 0.5) * 1.5 : 0;
         ctx.translate(0, bob + idleBob);
 
+        // ── Resolve skin palette (rainbow cycles hue over time) ──
+        this.skinTime += 0.05;
+        let PAL_MID, PAL_DARK, PAL_DARKER, PAL_BELLY;
+        if (this.skin && this.skin.rainbow) {
+            const h = (this.skinTime * 30) % 360;
+            PAL_MID    = `hsl(${h},80%,55%)`;
+            PAL_DARK   = `hsl(${(h+20)%360},80%,42%)`;
+            PAL_DARKER = `hsl(${(h+40)%360},75%,28%)`;
+            PAL_BELLY  = `hsl(${(h+180)%360},80%,78%)`;
+        } else {
+            const s = this.skin || SKINS[0];
+            PAL_MID    = s.mid;    PAL_DARK   = s.dark;
+            PAL_DARKER = s.darker; PAL_BELLY  = s.belly;
+        }
+
         // Shadow
         ctx.fillStyle = 'rgba(0,0,0,0.3)';
         ctx.beginPath();
@@ -350,43 +506,43 @@ class Player {
         ctx.save();
         ctx.translate(-this.w/2 + 2, 2);
         ctx.rotate(tailWag);
-        ctx.fillStyle = '#2d8a2d';
+        ctx.fillStyle = PAL_DARK;
         ctx.beginPath();
         ctx.ellipse(-8, 4, 14, 7, -0.4, 0, Math.PI*2);
         ctx.fill();
         // Tail tip
-        ctx.fillStyle = '#1a6b1a';
+        ctx.fillStyle = PAL_DARKER;
         ctx.beginPath();
         ctx.ellipse(-18, 8, 7, 4, -0.6, 0, Math.PI*2);
         ctx.fill();
         ctx.restore();
 
         // Body
-        ctx.fillStyle = '#3aaa3a';
+        ctx.fillStyle = PAL_MID;
         ctx.beginPath();
         ctx.ellipse(0, 4, 16, 20, 0, 0, Math.PI*2);
         ctx.fill();
 
         // Belly
-        ctx.fillStyle = '#90ee90';
+        ctx.fillStyle = PAL_BELLY;
         ctx.beginPath();
         ctx.ellipse(4, 8, 9, 14, 0.2, 0, Math.PI*2);
         ctx.fill();
 
         // Neck + Head
-        ctx.fillStyle = '#3aaa3a';
+        ctx.fillStyle = PAL_MID;
         ctx.beginPath();
         ctx.ellipse(8, -14, 10, 14, 0.3, 0, Math.PI*2);
         ctx.fill();
 
         // Head
-        ctx.fillStyle = '#3aaa3a';
+        ctx.fillStyle = PAL_MID;
         ctx.beginPath();
         ctx.ellipse(16, -22, 13, 10, 0.15, 0, Math.PI*2);
         ctx.fill();
 
         // Snout
-        ctx.fillStyle = '#2d8a2d';
+        ctx.fillStyle = PAL_DARK;
         ctx.beginPath();
         ctx.ellipse(26, -20, 9, 6, 0.1, 0, Math.PI*2);
         ctx.fill();
@@ -407,7 +563,7 @@ class Player {
         ctx.fill();
 
         // Nostril
-        ctx.fillStyle = '#1a6b1a';
+        ctx.fillStyle = PAL_DARKER;
         ctx.beginPath();
         ctx.arc(30, -22, 1.5, 0, Math.PI*2);
         ctx.fill();
@@ -420,7 +576,7 @@ class Player {
         }
 
         // Arms (tiny T-Rex arms!)
-        ctx.fillStyle = '#2d8a2d';
+        ctx.fillStyle = PAL_DARK;
         // Upper arm
         ctx.beginPath();
         ctx.ellipse(14, -2, 5, 3, 0.5, 0, Math.PI*2);
@@ -437,7 +593,7 @@ class Player {
 
         // Legs
         const legSwing = this.state === 'run' ? Math.sin(this.frame * 1.5) * 0.4 : 0;
-        ctx.fillStyle = '#2d8a2d';
+        ctx.fillStyle = PAL_DARK;
         // Left leg
         ctx.save();
         ctx.translate(-4, 14);
@@ -445,7 +601,7 @@ class Player {
         ctx.beginPath();
         ctx.ellipse(0, 5, 5, 9, 0, 0, Math.PI*2);
         ctx.fill();
-        ctx.fillStyle = '#1a6b1a';
+        ctx.fillStyle = PAL_DARKER;
         ctx.beginPath();
         ctx.ellipse(-2, 14, 6, 4, -0.2, 0, Math.PI*2);
         ctx.fill();
@@ -455,10 +611,10 @@ class Player {
         ctx.translate(4, 14);
         ctx.rotate(legSwing);
         ctx.beginPath();
-        ctx.fillStyle = '#2d8a2d';
+        ctx.fillStyle = PAL_DARK;
         ctx.ellipse(0, 5, 5, 9, 0, 0, Math.PI*2);
         ctx.fill();
-        ctx.fillStyle = '#1a6b1a';
+        ctx.fillStyle = PAL_DARKER;
         ctx.beginPath();
         ctx.ellipse(2, 14, 6, 4, 0.2, 0, Math.PI*2);
         ctx.fill();
@@ -535,7 +691,7 @@ class Raptor extends Enemy {
         if (this.x < this.startX - this.patrolRange || this.x > this.startX + this.patrolRange) {
             this.vx = -this.vx;
         }
-        if (this.x < 0 || this.x + this.w > W) { this.vx = -this.vx; }
+        if (this.x < 0 || this.x + this.w > levelDef.width) { this.vx = -this.vx; }
         this.facing = this.vx > 0 ? 1 : -1;
 
         // Animation
@@ -653,7 +809,7 @@ class Pterodactyl extends Enemy {
             this.facing = this.vx > 0 ? 1 : -1;
         }
         if (this.x < 0) { this.vx = Math.abs(this.vx); this.facing = 1; }
-        if (this.x + this.w > W) { this.vx = -Math.abs(this.vx); this.facing = -1; }
+        if (this.x + this.w > levelDef.width) { this.vx = -Math.abs(this.vx); this.facing = -1; }
         this.facing = this.vx > 0 ? 1 : -1;
         this.wingAngle += 0.18;
         this.frameTimer++;
@@ -785,7 +941,7 @@ class Triceratops extends Enemy {
         if (this.x < this.startX - this.patrolRange || this.x > this.startX + this.patrolRange) {
             this.vx = -this.vx;
         }
-        if (this.x < 0 || this.x + this.w > W) this.vx = -this.vx;
+        if (this.x < 0 || this.x + this.w > levelDef.width) this.vx = -this.vx;
         this.facing = this.vx > 0 ? 1 : -1;
 
         this.frameTimer++;
@@ -899,6 +1055,294 @@ class Triceratops extends Enemy {
 
         ctx.restore();
     }
+}
+
+// ── Boss ──────────────────────────────────────────────────────
+// A much larger themed creature with HP, attack phases, contact damage,
+// and ranged attacks on the hazard theme. Stomp to damage (brief i-frames after hit).
+class Boss {
+    constructor(def) {
+        this.kind = def.kind;         // 'raptor' | 'triceratops' | 'pterodactyl'
+        this.themeKey = def.themeKey; // 'lab' | 'dome' | 'hazard'
+        this.name = def.name;
+        this.color = def.color;
+        this.x = def.x; this.y = def.y;
+        // Bosses are ~2.4x scale of their base creatures
+        if (this.kind === 'raptor')       { this.w = 96;  this.h = 106; }
+        else if (this.kind === 'triceratops') { this.w = 134; this.h = 106; }
+        else                              { this.w = 120; this.h = 76;  } // pterodactyl
+        this.vx = 0; this.vy = 0;
+        this.onGround = false;
+        this.facing = -1;
+        this.hpMax = def.hp;
+        this.hp = def.hp;
+        this.alive = true;
+        this.invuln = 0;          // i-frames after being stomped
+        this.phase = 'idle';      // idle -> charge -> jump -> attack
+        this.phaseTimer = 60;
+        this.frameTimer = 0;
+        this.frame = 0;
+        this.wingAngle = 0;
+    }
+
+    nextPhase(player) {
+        const opts = this.kind === 'pterodactyl'
+            ? ['swoop','hover','attack','idle']
+            : ['charge','jump','attack','idle'];
+        this.phase = opts[randInt(0, opts.length - 1)];
+        // Shorten pauses as HP drops -> faster, angrier
+        const rage = 1 - (this.hp / this.hpMax) * 0.5;
+        this.phaseTimer = Math.floor((this.phase === 'idle' ? 50 : 110) / rage);
+    }
+
+    update(platforms, player) {
+        if (!this.alive) return;
+        if (this.invuln > 0) this.invuln--;
+        this.phaseTimer--;
+        if (this.phaseTimer <= 0) this.nextPhase(player);
+
+        this.frameTimer++;
+        if (this.frameTimer > 6) { this.frame = (this.frame + 1) % 4; this.frameTimer = 0; }
+        this.wingAngle += 0.2;
+
+        const dirToPlayer = (player.x + player.w/2) > (this.x + this.w/2) ? 1 : -1;
+        this.facing = dirToPlayer;
+
+        if (this.kind === 'pterodactyl') {
+            // Flying boss: no gravity; swoops + hovers + shoots
+            const targetY = this.phase === 'swoop' ? player.y - 20 : 160;
+            this.vy += ((targetY - this.y) * 0.004) - this.vy * 0.05;
+            this.vx += dirToPlayer * (this.phase === 'swoop' ? 0.25 : 0.08) - this.vx * 0.08;
+            this.vx = clamp(this.vx, -5, 5);
+            this.vy = clamp(this.vy, -4, 6);
+            this.x += this.vx;
+            this.y += this.vy;
+            this.x = clamp(this.x, 0, levelDef.width - this.w);
+            this.y = clamp(this.y, 40, 320);
+            // Fire projectiles during 'attack' phase
+            if (this.phase === 'attack' && this.phaseTimer % 22 === 0) {
+                this.shoot(player);
+            }
+        } else {
+            // Grounded boss: gravity + platform collision
+            this.vy += 0.7;
+            if (this.vy > 16) this.vy = 16;
+
+            if (this.phase === 'charge') {
+                this.vx += dirToPlayer * 0.35;
+                this.vx = clamp(this.vx, -5, 5);
+            } else if (this.phase === 'jump' && this.onGround) {
+                this.vy = -15;
+                this.vx = dirToPlayer * 4.2;
+            } else if (this.phase === 'attack') {
+                this.vx *= 0.85;
+                // Bosses of lava/jungle also spit projectiles during attack phase
+                if (this.phaseTimer % 28 === 0) this.shoot(player);
+            } else {
+                this.vx *= 0.9;
+            }
+
+            this.x += this.vx;
+            this.y += this.vy;
+            this.onGround = false;
+            for (const p of platforms) {
+                if (rectOverlap({x:this.x,y:this.y,w:this.w,h:this.h}, p)) {
+                    if (this.vy >= 0 && this.y + this.h - this.vy <= p.y + 8) {
+                        this.y = p.y - this.h; this.vy = 0; this.onGround = true;
+                    } else if (this.vy < 0) {
+                        this.y = p.y + p.h; this.vy = 0;
+                    } else {
+                        this.vx = -this.vx;
+                    }
+                }
+            }
+            if (this.x < 0) { this.x = 0; this.vx = Math.abs(this.vx); }
+            if (this.x + this.w > levelDef.width) { this.x = levelDef.width - this.w; this.vx = -Math.abs(this.vx); }
+        }
+    }
+
+    shoot(player) {
+        const cx = this.x + this.w/2;
+        const cy = this.y + this.h/2;
+        const tx = player.x + player.w/2;
+        const ty = player.y + player.h/2;
+        const dx = tx - cx, dy = ty - cy;
+        const len = Math.max(1, Math.hypot(dx, dy));
+        const speed = 5.5;
+        const kind = this.themeKey; // 'lab'|'dome'|'hazard'
+        bossProjectiles.push({
+            x: cx, y: cy,
+            vx: (dx / len) * speed,
+            vy: (dy / len) * speed,
+            kind,
+            life: 180,
+            r: 8,
+        });
+    }
+
+    hit() {
+        if (this.invuln > 0 || !this.alive) return false;
+        this.hp--;
+        this.invuln = 50;
+        spawnParticles(this.x + this.w/2, this.y + this.h/2, this.color, 22, 5);
+        if (this.hp <= 0) {
+            this.alive = false;
+            spawnParticles(this.x + this.w/2, this.y + this.h/2, '#ffd700', 50, 7);
+        }
+        return true;
+    }
+
+    draw() {
+        if (!this.alive) return;
+        ctx.save();
+        ctx.translate(this.x + this.w/2, this.y + this.h/2);
+        if (this.facing === -1) ctx.scale(-1, 1);
+
+        // Damage blink
+        if (this.invuln > 0 && Math.floor(this.invuln / 4) % 2 === 0) {
+            ctx.globalAlpha = 0.45;
+        }
+        // Menacing aura
+        ctx.shadowColor = this.color;
+        ctx.shadowBlur = 20;
+
+        // Shadow
+        ctx.fillStyle = 'rgba(0,0,0,0.35)';
+        ctx.beginPath();
+        ctx.ellipse(0, this.h/2 + 6, this.w/2, 8, 0, 0, Math.PI*2);
+        ctx.fill();
+
+        const scale = this.w / 40;
+        ctx.scale(scale, scale);
+        // Reuse a styled silhouette per kind
+        if (this.kind === 'raptor') this._drawRaptor();
+        else if (this.kind === 'triceratops') this._drawTriceratops();
+        else this._drawPterodactyl();
+
+        ctx.restore();
+    }
+
+    _drawRaptor() {
+        const bob = Math.sin(this.frame * 1.5) * 1.5;
+        ctx.translate(0, bob);
+        // Tail
+        ctx.fillStyle = darken(this.color, 20);
+        ctx.beginPath(); ctx.ellipse(-15, 5, 15, 6, -0.3, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(-26, 9, 8, 4, -0.5, 0, Math.PI*2); ctx.fill();
+        // Body
+        ctx.fillStyle = this.color;
+        ctx.beginPath(); ctx.ellipse(0, 4, 14, 17, 0, 0, Math.PI*2); ctx.fill();
+        // Belly
+        ctx.fillStyle = lighten(this.color, 40);
+        ctx.beginPath(); ctx.ellipse(4, 8, 7, 12, 0.2, 0, Math.PI*2); ctx.fill();
+        // Head
+        ctx.fillStyle = this.color;
+        ctx.beginPath(); ctx.ellipse(16, -15, 12, 10, 0.1, 0, Math.PI*2); ctx.fill();
+        // Snout
+        ctx.fillStyle = darken(this.color, 20);
+        ctx.beginPath(); ctx.ellipse(25, -14, 9, 6, 0, 0, Math.PI*2); ctx.fill();
+        // Eye (red/angry)
+        ctx.fillStyle = '#ffee00';
+        ctx.beginPath(); ctx.arc(19, -18, 3.5, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#d00';
+        ctx.beginPath(); ctx.arc(20, -18, 2, 0, Math.PI*2); ctx.fill();
+        // Fangs
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(24, -15, 3, 4);
+        ctx.fillRect(28, -15, 3, 4);
+        // Horn-crest (boss exclusive)
+        ctx.fillStyle = darken(this.color, 30);
+        ctx.beginPath();
+        ctx.moveTo(10, -25); ctx.lineTo(18, -34); ctx.lineTo(22, -25); ctx.closePath(); ctx.fill();
+        // Legs
+        const legSwing = Math.sin(this.frame * 1.5) * 0.4;
+        ctx.fillStyle = darken(this.color, 20);
+        ctx.save(); ctx.translate(-3, 12); ctx.rotate(-legSwing);
+        ctx.beginPath(); ctx.ellipse(0, 6, 5, 10, 0, 0, Math.PI*2); ctx.fill();
+        ctx.restore();
+        ctx.save(); ctx.translate(3, 12); ctx.rotate(legSwing);
+        ctx.beginPath(); ctx.ellipse(0, 6, 5, 10, 0, 0, Math.PI*2); ctx.fill();
+        ctx.restore();
+    }
+
+    _drawTriceratops() {
+        // Body
+        ctx.fillStyle = this.color;
+        ctx.beginPath(); ctx.ellipse(0, 2, 20, 15, 0, 0, Math.PI*2); ctx.fill();
+        // Belly
+        ctx.fillStyle = lighten(this.color, 35);
+        ctx.beginPath(); ctx.ellipse(0, 7, 12, 8, 0, 0, Math.PI*2); ctx.fill();
+        // Head
+        ctx.fillStyle = this.color;
+        ctx.beginPath(); ctx.ellipse(18, -4, 14, 11, 0, 0, Math.PI*2); ctx.fill();
+        // Frill
+        ctx.fillStyle = darken(this.color, 15);
+        ctx.beginPath(); ctx.ellipse(10, -10, 14, 14, 0, 0, Math.PI*2); ctx.fill();
+        // Spikes around frill
+        ctx.fillStyle = '#fff';
+        for (let i = 0; i < 5; i++) {
+            const a = -Math.PI/2 + (i - 2) * 0.4;
+            const sx = 10 + Math.cos(a) * 14;
+            const sy = -10 + Math.sin(a) * 14;
+            ctx.beginPath();
+            ctx.moveTo(sx, sy);
+            ctx.lineTo(sx + Math.cos(a) * 6, sy + Math.sin(a) * 6);
+            ctx.lineTo(sx + Math.cos(a + 0.3) * 3, sy + Math.sin(a + 0.3) * 3);
+            ctx.closePath(); ctx.fill();
+        }
+        // Horns
+        ctx.fillStyle = '#f5f0e0';
+        ctx.beginPath(); ctx.moveTo(20, -9); ctx.lineTo(32, -18); ctx.lineTo(22, -6); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(24, -2); ctx.lineTo(36, -10); ctx.lineTo(26, 1); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(26, 5); ctx.lineTo(34, 8); ctx.lineTo(24, 7); ctx.closePath(); ctx.fill();
+        // Eye
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(21, -6, 3, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#000';
+        ctx.beginPath(); ctx.arc(22, -6, 1.6, 0, Math.PI*2); ctx.fill();
+        // Legs
+        ctx.fillStyle = darken(this.color, 20);
+        ctx.beginPath(); ctx.ellipse(-10, 14, 5, 8, 0, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse( 10, 14, 5, 8, 0, 0, Math.PI*2); ctx.fill();
+    }
+
+    _drawPterodactyl() {
+        const wf = Math.sin(this.wingAngle);
+        // Wings (huge)
+        ctx.fillStyle = darken(this.color, 10);
+        ctx.save(); ctx.translate(-6, -4); ctx.rotate(-0.3 + wf * 0.6);
+        ctx.beginPath(); ctx.ellipse(-16, -8, 24, 9, -0.4, 0, Math.PI*2); ctx.fill();
+        ctx.restore();
+        ctx.save(); ctx.translate(6, -4); ctx.rotate(0.3 - wf * 0.6);
+        ctx.beginPath(); ctx.ellipse(16, -8, 24, 9, 0.4, 0, Math.PI*2); ctx.fill();
+        ctx.restore();
+        // Wing membrane
+        ctx.fillStyle = lighten(this.color, 30);
+        ctx.save(); ctx.translate(-5, 0); ctx.rotate(wf * 0.5);
+        ctx.beginPath(); ctx.ellipse(-10, 4, 18, 6, -0.2, 0, Math.PI*2); ctx.fill();
+        ctx.restore();
+        ctx.save(); ctx.translate(5, 0); ctx.rotate(-wf * 0.5);
+        ctx.beginPath(); ctx.ellipse(10, 4, 18, 6, 0.2, 0, Math.PI*2); ctx.fill();
+        ctx.restore();
+        // Body
+        ctx.fillStyle = this.color;
+        ctx.beginPath(); ctx.ellipse(0, 2, 10, 14, 0, 0, Math.PI*2); ctx.fill();
+        // Head + beak
+        ctx.beginPath(); ctx.ellipse(10, -10, 11, 8, 0.2, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = darken(this.color, 25);
+        ctx.beginPath(); ctx.moveTo(15, -13); ctx.lineTo(30, -9); ctx.lineTo(15, -7); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(15, -7); ctx.lineTo(24, -5); ctx.lineTo(15, -4); ctx.closePath(); ctx.fill();
+        // Crest
+        ctx.fillStyle = '#ffcc00';
+        ctx.beginPath(); ctx.moveTo(6, -15); ctx.lineTo(12, -26); ctx.lineTo(16, -15); ctx.closePath(); ctx.fill();
+        // Eye
+        ctx.fillStyle = '#ff4400';
+        ctx.beginPath(); ctx.arc(13, -12, 3, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#000';
+        ctx.beginPath(); ctx.arc(13.5, -12, 1.3, 0, Math.PI*2); ctx.fill();
+    }
+
+    get hitbox() { return {x:this.x+8, y:this.y+8, w:this.w-16, h:this.h-12}; }
 }
 
 // ── Collectible ───────────────────────────────────────────────
@@ -1047,85 +1491,139 @@ function drawBackground(levelDef) {
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, W, H);
 
-    // Stars
+    // Stars (very slow parallax)
+    const starShift = camera.x * 0.15;
     bgStars.forEach(s => {
         s.blink += 0.03;
         const alpha = (Math.sin(s.blink) + 1) / 2 * 0.8 + 0.2;
         ctx.fillStyle = `rgba(255,255,255,${alpha})`;
         ctx.beginPath();
-        ctx.arc(s.x, s.y, s.size, 0, Math.PI*2);
+        const sx = ((s.x - starShift) % W + W) % W;
+        ctx.arc(sx, s.y, s.size, 0, Math.PI*2);
         ctx.fill();
     });
 
-    // Distant mountains/volcano silhouettes
+    // Distant mountains/volcano silhouettes (mid parallax)
     drawMountains(levelDef);
 
-    // Clouds/mist
+    // Clouds/mist (fast parallax + drift) - tinted per theme
+    const cloudColorBase =
+        (levelDef.theme && levelDef.theme.cloudColor) ||
+        levelDef.cloudColor ||
+        'rgba(180,255,230,';
+    const cloudShift = camera.x * 0.5;
     clouds.forEach(c => {
         c.x -= c.speed;
         if (c.x + c.w < 0) c.x = W;
-        ctx.fillStyle = `rgba(255,200,100,${c.opacity})`;
+        ctx.fillStyle = `${cloudColorBase}${c.opacity})`;
         ctx.beginPath();
-        ctx.ellipse(c.x + c.w/2, c.y, c.w/2, c.h/2, 0, 0, Math.PI*2);
+        const cx = ((c.x - cloudShift) % (W + c.w) + (W + c.w)) % (W + c.w) - c.w/2;
+        ctx.ellipse(cx + c.w/2, c.y, c.w/2, c.h/2, 0, 0, Math.PI*2);
         ctx.fill();
     });
 }
 
 function drawMountains(levelDef) {
-    const isVolcano = levelDef.name.includes("Volcanic") || levelDef.name.includes("Lava");
-    const isJungle = levelDef.name.includes("Jungle");
+    const style =
+        (levelDef.theme && levelDef.theme.style) ||
+        levelDef.style ||
+        'lab';
+    const parallax = camera.x * 0.3;
+    const t = Date.now();
 
-    if (isVolcano || levelDef.name.includes("Lava")) {
-        // Volcanoes
-        ctx.fillStyle = '#3d1200';
-        for (let i = 0; i < 3; i++) {
-            const bx = 120 + i * 290;
-            const bh = 130 + i * 30;
+    if (style === 'lab') {
+        // Sterile-lab: rows of containment cylinders / cloning tanks
+        const tile = 220;
+        const start = Math.floor(parallax / tile) - 1;
+        for (let i = start; i < start + Math.ceil(W / tile) + 3; i++) {
+            const bx = 90 + i * tile - parallax;
+            const bh = 150 + ((i % 3) + 3) % 3 * 30;
+            // Tank chassis (dark steel)
+            ctx.fillStyle = '#1a2630';
+            ctx.fillRect(bx - 22, H - bh, 44, bh);
+            // Top + bottom caps
+            ctx.fillStyle = '#2a3a48';
+            ctx.fillRect(bx - 26, H - bh - 8, 52, 12);
+            ctx.fillRect(bx - 26, H - 14, 52, 8);
+            // Glow tube (cyan growth fluid)
+            const tube = ctx.createLinearGradient(bx, H - bh + 12, bx, H - 18);
+            tube.addColorStop(0,   'rgba(0,255,210,0.55)');
+            tube.addColorStop(0.5, 'rgba(0,180,160,0.55)');
+            tube.addColorStop(1,   'rgba(0,60,90,0.85)');
+            ctx.fillStyle = tube;
+            ctx.fillRect(bx - 12, H - bh + 12, 24, bh - 30);
+            // Bubbles rising inside
+            ctx.fillStyle = 'rgba(200,255,235,0.85)';
+            for (let b = 0; b < 4; b++) {
+                const phase = (t / 30 + i * 53 + b * 41) % (bh - 40);
+                const by = H - 24 - phase;
+                ctx.beginPath();
+                ctx.arc(bx + Math.sin(b + i + t/400) * 5, by, 2, 0, Math.PI*2);
+                ctx.fill();
+            }
+        }
+    } else if (style === 'dome') {
+        // Bio-dome silhouettes with vines spilling out
+        const tile = 320;
+        const start = Math.floor(parallax / tile) - 1;
+        for (let i = start; i < start + Math.ceil(W / tile) + 3; i++) {
+            const bx = 160 + i * tile - parallax;
+            const bh = 130 + ((i % 3) + 3) % 3 * 25;
+            // Dome
+            ctx.fillStyle = '#0c2818';
+            ctx.beginPath();
+            ctx.arc(bx, H - 8, bh, Math.PI, 0);
+            ctx.closePath(); ctx.fill();
+            // Lattice grid (dome ribs)
+            ctx.strokeStyle = 'rgba(80,200,140,0.35)';
+            ctx.lineWidth = 1;
+            for (let r = 0.25; r < 1; r += 0.2) {
+                ctx.beginPath();
+                ctx.arc(bx, H - 8, bh * r, Math.PI, 0);
+                ctx.stroke();
+            }
+            // Vines hanging from the dome
+            ctx.strokeStyle = '#3e7a30';
+            ctx.lineWidth = 2;
+            for (let v = -2; v <= 2; v++) {
+                ctx.beginPath();
+                ctx.moveTo(bx + v * 22, H - bh + 4);
+                ctx.bezierCurveTo(
+                    bx + v * 24 + 6, H - bh * 0.5,
+                    bx + v * 22 - 6, H - bh * 0.2,
+                    bx + v * 22,     H
+                );
+                ctx.stroke();
+            }
+        }
+    } else if (style === 'hazard') {
+        // Wrecked containment + flashing red beacons
+        const tile = 290;
+        const start = Math.floor(parallax / tile) - 1;
+        for (let i = start; i < start + Math.ceil(W / tile) + 3; i++) {
+            const bx = 120 + i * tile - parallax;
+            const bh = 130 + ((i % 3) + 3) % 3 * 30;
+            // Ragged silhouette of a broken tank
+            ctx.fillStyle = '#1c0808';
             ctx.beginPath();
             ctx.moveTo(bx - 90, H);
-            ctx.lineTo(bx, H - bh);
+            ctx.lineTo(bx - 60, H - bh * 0.6);
+            ctx.lineTo(bx - 30, H - bh * 0.85);
+            ctx.lineTo(bx + 10, H - bh);
+            ctx.lineTo(bx + 50, H - bh * 0.7);
             ctx.lineTo(bx + 90, H);
             ctx.closePath(); ctx.fill();
-            // Lava glow at tip
-            const lavGrad = ctx.createRadialGradient(bx, H - bh - 5, 2, bx, H - bh, 25);
-            lavGrad.addColorStop(0, 'rgba(255,140,0,0.9)');
-            lavGrad.addColorStop(0.5, 'rgba(255,50,0,0.4)');
-            lavGrad.addColorStop(1, 'rgba(255,0,0,0)');
-            ctx.fillStyle = lavGrad;
+            // Pulsing red alert beacon at the top
+            const flick = (Math.sin(t / 120 + i * 2) + 1) / 2;
+            const beaconY = H - bh - 6;
+            const r = 12 + flick * 10;
+            const beacon = ctx.createRadialGradient(bx, beaconY, 2, bx, beaconY, r + 18);
+            beacon.addColorStop(0,   'rgba(255,90,90,0.95)');
+            beacon.addColorStop(0.5, 'rgba(220,30,30,0.45)');
+            beacon.addColorStop(1,   'rgba(255,0,0,0)');
+            ctx.fillStyle = beacon;
             ctx.beginPath();
-            ctx.arc(bx, H - bh - 5, 25, 0, Math.PI*2);
-            ctx.fill();
-        }
-        // Lava pools on ground
-        ctx.fillStyle = '#ff4400';
-        ctx.shadowColor = '#ff8800';
-        ctx.shadowBlur = 15;
-        ctx.beginPath();
-        ctx.ellipse(180, H - 28, 50, 12, 0, 0, Math.PI*2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.ellipse(550, H - 28, 40, 10, 0, 0, Math.PI*2);
-        ctx.fill();
-        ctx.shadowBlur = 0;
-    }
-
-    if (isJungle) {
-        // Trees silhouette
-        ctx.fillStyle = '#003300';
-        for (let i = 0; i < 12; i++) {
-            const tx = i * 80 + 20;
-            const th = 80 + Math.sin(i * 1.3) * 40;
-            // Trunk
-            ctx.fillRect(tx + 12, H - th, 10, th);
-            // Canopy
-            ctx.beginPath();
-            ctx.arc(tx + 17, H - th - 15, 28, 0, Math.PI*2);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(tx + 5, H - th - 5, 20, 0, Math.PI*2);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(tx + 30, H - th - 8, 22, 0, Math.PI*2);
+            ctx.arc(bx, beaconY, r + 14, 0, Math.PI*2);
             ctx.fill();
         }
     }
@@ -1195,21 +1693,37 @@ let messageActive = false, messageCallback = null;
 let levelTransitioning = false;
 
 function loadLevel(levelIdx) {
-    levelDef = LEVELS[levelIdx - 1];
+    levelDef = generateLevel(levelIdx);
     platforms = levelDef.platforms;
     player = new Player(levelDef.playerStart.x, levelDef.playerStart.y);
     enemies = levelDef.enemies.map(e => {
         if (e.type === 'raptor') return new Raptor(e.x, e.y);
         if (e.type === 'pterodactyl') return new Pterodactyl(e.x, e.y, e.range);
         if (e.type === 'triceratops') return new Triceratops(e.x, e.y);
-    });
+    }).filter(Boolean);
     collectibles = levelDef.collectibles.map(c => new Collectible(c.x, c.y, c.type));
-    portal = new Portal(levelDef.portal.x, levelDef.portal.y);
+    // Boss level: spawn boss, no portal yet (appears after boss dies)
+    if (levelDef.isBoss && levelDef.boss) {
+        boss = new Boss(levelDef.boss);
+        portal = null;
+    } else {
+        boss = null;
+        portal = new Portal(levelDef.portal.x, levelDef.portal.y);
+    }
+    bossProjectiles = [];
     particles = [];
     generateClouds();
     generateStars();
+    camera.x = 0;
     levelTransitioning = false;
-    document.getElementById('level-display').textContent = `Level ${levelIdx}`;
+    document.getElementById('level-display').textContent =
+        levelDef.isBoss ? `PROTOTYPE ${levelIdx}` : `Sector ${levelIdx}`;
+}
+
+// Camera follows the player, clamped to level bounds
+function updateCamera() {
+    const target = player.x + player.w / 2 - W / 2;
+    camera.x = clamp(target, 0, Math.max(0, levelDef.width - W));
 }
 
 // ── HUD ───────────────────────────────────────────────────────
@@ -1217,6 +1731,9 @@ function updateHUD() {
     document.getElementById('score-display').textContent = `Score: ${score}`;
     document.getElementById('lives-display').textContent = `x${lives}`;
     document.getElementById('bones-display').textContent = `Bones: ${bones}`;
+    // Persist wallet whenever HUD changes (every pickup / damage event)
+    save.bones = bones;
+    writeSave();
 }
 
 // ── Messages ──────────────────────────────────────────────────
@@ -1239,51 +1756,180 @@ function hideMessage() {
 }
 
 // ── Game Over / Win ───────────────────────────────────────────
+const BTN_STYLE = 'padding:12px 28px;font-size:18px;font-family:Courier New,monospace;font-weight:bold;background:linear-gradient(135deg,#00d4aa,#006e58);color:white;border:3px solid #ffd700;border-radius:8px;cursor:pointer;margin:6px;';
+const SHOP_BTN_STYLE = 'padding:12px 28px;font-size:18px;font-family:Courier New,monospace;font-weight:bold;background:linear-gradient(135deg,#6b3aff,#3a1a88);color:white;border:3px solid #ffd700;border-radius:8px;cursor:pointer;margin:6px;';
+
 function triggerGameOver() {
     gameRunning = false;
     gameOver = true;
     const ov = document.getElementById('overlay');
     ov.innerHTML = `
-        <div class="deco">💀</div>
-        <h1 style="color:#ff4444">GAME OVER</h1>
-        <div class="subtitle" style="color:#ffaa66">The dinos got you! Score: ${score}</div>
-        <div class="controls-info">You collected <span>${bones} bones</span> and <span>${score} points</span></div>
-        <button id=\"start-btn\" style=\"padding:14px 40px;font-size:20px;font-family:Courier New,monospace;font-weight:bold;background:linear-gradient(135deg,#ff6b1a,#cc4400);color:white;border:3px solid #ffd700;border-radius:8px;cursor:pointer;\">🔄 TRY AGAIN</button>
+        <div class="deco">☠️🧬</div>
+        <h1 style="color:#ff4477">SPECIMEN TERMINATED</h1>
+        <div class="subtitle" style="color:#aaffee">Containment failed. Score: ${score}</div>
+        <div class="controls-info">You have <span>${bones} 🦴 bones</span> banked — spend them on new clones in the shop!</div>
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;">
+            <button id="retry-btn" style="${BTN_STYLE}">🔄 TRY AGAIN</button>
+            <button id="shop-btn-over" style="${SHOP_BTN_STYLE}">🛒 GO TO SHOP</button>
+        </div>
     `;
     ov.style.display = 'flex';
-    setTimeout(() => { const b = document.getElementById('start-btn'); if(b) b.addEventListener('click', restartGame); }, 50);
+    // Wire the buttons on the NEXT tick so the DOM has updated
+    requestAnimationFrame(() => {
+        const r = document.getElementById('retry-btn');
+        if (r) r.addEventListener('click', restartGame);
+        const s = document.getElementById('shop-btn-over');
+        if (s) s.addEventListener('click', openShop);
+    });
 }
 
 function triggerWin() {
     gameRunning = false;
+    // Treat a completed run like a finished run for the Shop → PLAY path so that
+    // returning to a fresh game resets score/lives via restartGame() instead of
+    // leaking them via startGame().
+    gameOver = true;
     const ov = document.getElementById('overlay');
     ov.innerHTML = `
-        <div class="deco">🏆🦕🎉</div>
-        <h1 style="color:#ffd700">YOU WIN!</h1>
-        <div class="subtitle" style="color:#90ee90">The dinos are free! Final Score: ${score}</div>
-        <div class="controls-info">Bones collected: <span>${bones}</span> | Final score: <span>${score}</span></div>
-        <button id=\"start-btn\" style=\"padding:14px 40px;font-size:20px;font-family:Courier New,monospace;font-weight:bold;background:linear-gradient(135deg,#ff6b1a,#cc4400);color:white;border:3px solid #ffd700;border-radius:8px;cursor:pointer;\">🔄 PLAY AGAIN</button>
+        <div class="deco">🏆🧬⚗️</div>
+        <h1 style="color:#ffd700">FACILITY ESCAPED!</h1>
+        <div class="subtitle" style="color:#aaffd6">All clones are free! Final Score: ${score}</div>
+        <div class="controls-info">Bones banked: <span>${bones} 🦴</span> — spend them on new clone skins!</div>
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;">
+            <button id="retry-btn" style="${BTN_STYLE}">🔄 PLAY AGAIN</button>
+            <button id="shop-btn-win" style="${SHOP_BTN_STYLE}">🛒 GO TO SHOP</button>
+        </div>
     `;
     ov.style.display = 'flex';
-    setTimeout(() => { const b = document.getElementById('start-btn'); if(b) b.addEventListener('click', restartGame); }, 50);
+    requestAnimationFrame(() => {
+        const r = document.getElementById('retry-btn');
+        if (r) r.addEventListener('click', restartGame);
+        const s = document.getElementById('shop-btn-win');
+        if (s) s.addEventListener('click', openShop);
+    });
 }
 
 function restartGame() {
-    score = 0; lives = 3; bones = 0; currentLevel = 1;
+    // Keep the bones wallet persistent across runs — only reset per-run state
+    score = 0; lives = 5; currentLevel = 1;
     updateHUD();
-    loadLevel(1);
     document.getElementById('overlay').style.display = 'none';
     document.getElementById('message-box').style.display = 'none';
-    gameRunning = true;
+    const shopEl = document.getElementById('shop-overlay');
+    if (shopEl) shopEl.style.display = 'none';
+    loadLevel(1);
     gameOver = false;
     messageActive = false;
+    // Critical: the loop exits when gameRunning becomes false, so we must restart it.
+    if (!gameRunning) {
+        gameRunning = true;
+        loop();
+    } else {
+        gameRunning = true;
+    }
 }
 
 function startGame() {
     document.getElementById('overlay').style.display = 'none';
-    loadLevel(1);
-    gameRunning = true;
-    loop();
+    const shopEl = document.getElementById('shop-overlay');
+    if (shopEl) shopEl.style.display = 'none';
+    // Optional ?level=N URL param for jumping to a specific level (handy for boss testing)
+    const urlLvl = parseInt(new URLSearchParams(location.search).get('level'), 10);
+    const startLvl = (Number.isFinite(urlLvl) && urlLvl >= 1 && urlLvl <= TOTAL_LEVELS) ? urlLvl : 1;
+    currentLevel = startLvl;
+    loadLevel(startLvl);
+    if (!gameRunning) {
+        gameRunning = true;
+        loop();
+    } else {
+        gameRunning = true;
+    }
+}
+
+// ── Shop ─────────────────────────────────────────────────────
+function renderShop() {
+    const el = document.getElementById('shop-overlay');
+    if (!el) return;
+    const cards = SKINS.map(s => {
+        const owned = save.owned.includes(s.id);
+        const equipped = save.equipped === s.id;
+        const affordable = bones >= s.cost;
+        let btnLabel, btnClass, btnDisabled;
+        if (equipped)       { btnLabel = 'EQUIPPED';           btnClass = 'shop-btn equipped'; btnDisabled = true; }
+        else if (owned)     { btnLabel = 'EQUIP';              btnClass = 'shop-btn equip';    btnDisabled = false; }
+        else if (affordable){ btnLabel = `BUY · ${s.cost} 🦴`; btnClass = 'shop-btn buy';      btnDisabled = false; }
+        else                { btnLabel = `${s.cost} 🦴`;      btnClass = 'shop-btn locked';   btnDisabled = true; }
+        // Preview swatch: three color circles
+        return `
+            <div class="skin-card ${equipped ? 'active' : ''}">
+                <div class="skin-emoji">${s.emoji}${s.rainbow ? '✨' : ''}</div>
+                <div class="skin-name">${s.name}</div>
+                <div class="skin-swatch">
+                    <span style="background:${s.mid}"></span>
+                    <span style="background:${s.dark}"></span>
+                    <span style="background:${s.belly}"></span>
+                </div>
+                <button class="${btnClass}" data-skin="${s.id}" ${btnDisabled ? 'disabled' : ''}>${btnLabel}</button>
+            </div>`;
+    }).join('');
+
+    el.innerHTML = `
+        <div class="shop-inner">
+            <h2 class="shop-title">🧬 CLONE LAB SHOP 🦴</h2>
+            <div class="shop-wallet">Wallet: <b>${bones} 🦴</b></div>
+            <div class="skin-grid">${cards}</div>
+            <div class="shop-actions">
+                <button id="shop-play" style="${BTN_STYLE}">${gameOver ? '🔄 TRY AGAIN' : '▶ PLAY'}</button>
+                <button id="shop-back" style="${SHOP_BTN_STYLE.replace('#6b3aff','#555').replace('#3a1a88','#222')}">✖ CLOSE</button>
+            </div>
+        </div>`;
+
+    el.querySelectorAll('.shop-btn').forEach(b => {
+        b.addEventListener('click', () => {
+            const id = b.getAttribute('data-skin');
+            if (b.classList.contains('buy')) buySkin(id);
+            else if (b.classList.contains('equip')) equipSkin(id);
+        });
+    });
+    document.getElementById('shop-play').addEventListener('click', () => {
+        el.style.display = 'none';
+        if (gameOver) restartGame(); else startGame();
+    });
+    document.getElementById('shop-back').addEventListener('click', closeShop);
+}
+
+function openShop() {
+    const el = document.getElementById('shop-overlay');
+    if (!el) return;
+    el.style.display = 'flex';
+    renderShop();
+}
+function closeShop() {
+    const el = document.getElementById('shop-overlay');
+    if (el) el.style.display = 'none';
+    // If we got here from the title or game-over screens, those overlays are still shown.
+    // If the game was running, do nothing — return to gameplay.
+}
+
+function buySkin(id) {
+    const skin = getSkin(id);
+    if (!skin || save.owned.includes(id)) return;
+    if (bones < skin.cost) return;
+    bones -= skin.cost;
+    save.bones = bones;
+    save.owned.push(id);
+    writeSave();
+    updateHUD();
+    renderShop();
+}
+
+function equipSkin(id) {
+    if (!save.owned.includes(id)) return;
+    save.equipped = id;
+    writeSave();
+    // Live-swap if a player already exists (e.g. opened shop from game-over)
+    if (typeof player !== 'undefined' && player) player.skin = currentSkin();
+    renderShop();
 }
 
 // ── Collision Logic ───────────────────────────────────────────
@@ -1302,7 +1948,7 @@ function checkCollisions() {
                 score += 150;
                 bones += 2;
                 spawnParticles(c.x + 10, c.y + 10, '#90ee90', 12, 3);
-                showMessage('🥚 Dino Egg!', '+150 pts +2 bones!', false);
+                // egg: extra particles already spawned above
             }
             updateHUD();
         }
@@ -1326,7 +1972,7 @@ function checkCollisions() {
                 score += pts;
                 bones += e.type === 'triceratops' ? 3 : 1;
                 spawnParticles(e.x + e.w/2, e.y + e.h/2, e.type === 'pterodactyl' ? '#cc44ff' : '#ff8800', 15, 4);
-                showMessage(`💥 ${e.type.charAt(0).toUpperCase()+e.type.slice(1)} stomped!`, `+${pts} pts!`, false);
+                // (no popup — stomp feedback is particles + sound of numbers rising)
                 updateHUD();
             } else {
                 // Player takes damage
@@ -1337,38 +1983,162 @@ function checkCollisions() {
                 if (lives <= 0) {
                     triggerGameOver();
                 } else {
-                    showMessage('💥 OUCH!', `${lives} lives remaining!`, false);
+                    // (no popup — red particles convey damage)
                 }
             }
         }
     });
 
-    // Portal
-    if (!levelTransitioning && rectOverlap(player.hitbox, portal.hitbox)) {
+    // Boss collision (contact damage / stomp to damage)
+    if (boss && boss.alive && rectOverlap(player.hitbox, boss.hitbox)) {
+        const playerBottom = player.y + player.h;
+        const bossTop = boss.y + 12;
+        const stomping = player.vy > 1 && playerBottom - player.vy <= bossTop + 6;
+        if ((stomping || player.isStomping()) && boss.invuln === 0) {
+            if (boss.hit()) {
+                player.vy = -12;
+                player.stompCooldown = 12;
+                score += 250;
+                updateHUD();
+                if (!boss.alive) {
+                    // Boss defeated! Spawn portal in arena center on ground
+                    score += 2000;
+                    bones += 10;
+                    updateHUD();
+                    spawnParticles(boss.x + boss.w/2, boss.y + boss.h/2, '#ffd700', 60, 8);
+                    const px = levelDef.width / 2 - 22;
+                    const py = 380;
+                    portal = new Portal(px, py);
+                }
+            }
+        } else if (boss.invuln === 0) {
+            player.invincible = 100;
+            lives--;
+            updateHUD();
+            spawnParticles(player.x + player.w/2, player.y + player.h/2, '#ff4444', 14, 4);
+            // Knock the player back
+            player.vx = (player.x < boss.x ? -1 : 1) * 9;
+            player.vy = -8;
+            if (lives <= 0) triggerGameOver();
+        }
+    }
+
+    // Boss projectile hits
+    if (!player.invincible) {
+        bossProjectiles.forEach(pr => {
+            if (pr.dead) return;
+            if (rectOverlap(player.hitbox, {x: pr.x - pr.r, y: pr.y - pr.r, w: pr.r * 2, h: pr.r * 2})) {
+                pr.dead = true;
+                player.invincible = 80;
+                lives--;
+                updateHUD();
+                spawnParticles(pr.x, pr.y, '#ff8800', 14, 4);
+                if (lives <= 0) triggerGameOver();
+            }
+        });
+    }
+
+    // Portal (instant teleport — no delay, no message wait)
+    if (portal && !levelTransitioning && rectOverlap(player.hitbox, portal.hitbox)) {
         levelTransitioning = true;
         score += 500;
         updateHUD();
-        if (currentLevel < LEVELS.length) {
+        // Quick flash of particles for feedback but no modal / setTimeout delay
+        spawnParticles(player.x + player.w/2, player.y + player.h/2, '#00ffff', 40, 6);
+        if (currentLevel < TOTAL_LEVELS) {
             currentLevel++;
-            showMessage(`🌟 Level ${currentLevel}!`, `Entering ${LEVELS[currentLevel-1].name}...`, false, () => {
-                loadLevel(currentLevel);
-            });
+            loadLevel(currentLevel);
         } else {
-            setTimeout(triggerWin, 500);
+            triggerWin();
         }
     }
 }
 
-// ── Draw HUD overlay on canvas ────────────────────────────────
+// ── Boss projectile update/draw ───────────────────────────────
+function updateBossProjectiles() {
+    bossProjectiles.forEach(p => {
+        if (p.dead) return;
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life--;
+        // Slight gravity for lab/dome projectiles; hazard ones fly straight
+        if (p.kind !== 'hazard') p.vy += 0.12;
+        if (p.y > H - 40 || p.x < 0 || p.x > levelDef.width || p.life <= 0) p.dead = true;
+    });
+    bossProjectiles = bossProjectiles.filter(p => !p.dead);
+}
+
+function drawBossProjectiles() {
+    bossProjectiles.forEach(p => {
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        let color = '#ff5500', glow = '#ff8800';
+        if (p.kind === 'dome')        { color = '#4caf50'; glow = '#aaff77'; }
+        else if (p.kind === 'hazard') { color = '#aa00ff'; glow = '#ff33ff'; }
+        ctx.shadowColor = glow;
+        ctx.shadowBlur = 14;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(0, 0, p.r, 0, Math.PI*2);
+        ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.globalAlpha = 0.7;
+        ctx.beginPath();
+        ctx.arc(-p.r/3, -p.r/3, p.r/3, 0, Math.PI*2);
+        ctx.fill();
+        ctx.restore();
+    });
+}
+
+// ── Draw HUD overlay on canvas (viewport-space, drawn after world) ──
 function drawCanvasHUD() {
-    // Level name
-    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    // Level title band
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
     ctx.fillRect(0, 0, W, 28);
-    ctx.fillStyle = '#ffd700';
+    ctx.fillStyle = levelDef.isBoss ? '#ff4444' : '#ffd700';
     ctx.font = 'bold 14px Courier New';
     ctx.textAlign = 'center';
-    ctx.fillText(`🌋 ${levelDef.name} — Reach the portal! 🚪`, W/2, 18);
+    const emoji = levelDef.isBoss ? '☣️' : '🧪';
+    const subtitle = levelDef.isBoss
+        ? `— Terminate ${levelDef.theme.bossName}! —`
+        : '— Reach the containment portal! —';
+    ctx.fillText(`${emoji} ${levelDef.name}  ${subtitle}  ${emoji}`, W/2, 18);
     ctx.textAlign = 'left';
+
+    // Progress bar (how far across the level)
+    if (!levelDef.isBoss) {
+        const barW = 140, barH = 6;
+        const bx = W - barW - 14, by = 10;
+        ctx.fillStyle = 'rgba(255,255,255,0.15)';
+        ctx.fillRect(bx, by, barW, barH);
+        const prog = clamp((player.x + player.w/2) / levelDef.width, 0, 1);
+        ctx.fillStyle = '#ffd700';
+        ctx.fillRect(bx, by, barW * prog, barH);
+    }
+
+    // Boss HP bar
+    if (boss && boss.alive) {
+        const barW = 520, barH = 16;
+        const bx = (W - barW) / 2, by = 36;
+        ctx.fillStyle = 'rgba(0,0,0,0.7)';
+        ctx.fillRect(bx - 4, by - 4, barW + 8, barH + 8);
+        ctx.fillStyle = '#333';
+        ctx.fillRect(bx, by, barW, barH);
+        const hpFrac = boss.hp / boss.hpMax;
+        const grad = ctx.createLinearGradient(bx, by, bx + barW, by);
+        grad.addColorStop(0, '#ff2200');
+        grad.addColorStop(1, '#ff8844');
+        ctx.fillStyle = grad;
+        ctx.fillRect(bx, by, barW * hpFrac, barH);
+        ctx.strokeStyle = '#ffd700';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(bx, by, barW, barH);
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 12px Courier New';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${boss.name}  —  ${boss.hp}/${boss.hpMax} HP`, W/2, by + 12);
+        ctx.textAlign = 'left';
+    }
 }
 
 // ── Main Game Loop ────────────────────────────────────────────
@@ -1377,25 +2147,40 @@ function loop(ts = 0) {
     if (!gameRunning) return;
     requestAnimationFrame(loop);
 
-    // Clear
-    drawBackground(levelDef);
-    drawPlatforms(levelDef, platforms);
-
-    // Update & draw entities
-    portal.update(); portal.draw();
-    collectibles.forEach(c => { c.update(); c.draw(); });
-    enemies.forEach(e => {
-        if (e.type === 'pterodactyl') e.update();
-        else e.update(platforms);
-        e.draw();
-    });
-
+    // Update phase (world state) before drawing
     if (!messageActive) {
         player.update(platforms);
+        enemies.forEach(e => {
+            if (e.type === 'pterodactyl') e.update();
+            else e.update(platforms);
+        });
+        collectibles.forEach(c => c.update());
+        if (portal) portal.update();
+        if (boss) boss.update(platforms, player);
+        updateBossProjectiles();
     }
-    player.draw();
+    updateCamera();
 
-    // Collisions
+    // ── Render ──
+    // Background (viewport-space, uses camera for parallax internally)
+    drawBackground(levelDef);
+
+    // World-space rendering: translate by -camera.x
+    ctx.save();
+    ctx.translate(-camera.x, 0);
+
+    drawPlatforms(levelDef, platforms);
+    collectibles.forEach(c => c.draw());
+    enemies.forEach(e => e.draw());
+    if (boss) boss.draw();
+    if (portal) portal.draw();
+    player.draw();
+    drawBossProjectiles();
+    drawParticles();
+
+    ctx.restore();
+
+    // Collisions (post-update)
     if (!messageActive && !levelTransitioning) {
         checkCollisions();
     }
@@ -1406,14 +2191,17 @@ function loop(ts = 0) {
     }
 
     updateParticles();
-    drawParticles();
     drawCanvasHUD();
 }
 
 // ── Kick off ──────────────────────────────────────────────────
 generateStars();
 generateClouds();
+// Initialize HUD so the persisted bone wallet is visible on the title screen
+updateHUD();
 
 // Make functions globally accessible
 window.startGame = startGame;
 window.restartGame = restartGame;
+window.openShop = openShop;
+window.closeShop = closeShop;
