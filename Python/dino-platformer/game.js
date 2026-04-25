@@ -1529,40 +1529,66 @@ class Collectible {
         ctx.translate(this.x + this.w/2, this.y + this.h/2 + bob);
 
         if (this.type === 'bone') {
-            // Clone-machine part — drawn as a glowing brass gear (cog).
+            // Clone-machine part — drawn as a proper mechanical cog:
+            // dark outline + steel-gold disk + 6 crisp rectangular teeth + bolt hole.
             ctx.rotate(this.bobTimer * 0.6);
-            ctx.shadowColor = '#ffe066';
-            ctx.shadowBlur = 8 + glow * 8;
-            const teeth = 8;
-            const rOuter = 9;
-            const rInner = 6;
-            ctx.fillStyle = '#f5c130';
-            ctx.beginPath();
-            for (let i = 0; i < teeth; i++) {
-                const a = (i / teeth) * Math.PI * 2;
-                const a2 = a + Math.PI / teeth;
-                ctx.lineTo(Math.cos(a) * rOuter, Math.sin(a) * rOuter);
-                ctx.lineTo(Math.cos(a + Math.PI / (teeth*2)) * rOuter, Math.sin(a + Math.PI / (teeth*2)) * rOuter);
-                ctx.lineTo(Math.cos(a2) * rInner, Math.sin(a2) * rInner);
+
+            // Outer halo glow (kept subtle so the silhouette stays sharp).
+            ctx.shadowColor = '#ffd24a';
+            ctx.shadowBlur = 4 + glow * 4;
+
+            const teethCount = 6;
+            const rDisk = 6.2;
+            const toothLen = 4.2;
+            const toothW = 3.6;
+
+            // Dark outline pass — slightly larger teeth + slightly larger disk.
+            ctx.fillStyle = '#1a1100';
+            for (let i = 0; i < teethCount; i++) {
+                ctx.save();
+                ctx.rotate((i / teethCount) * Math.PI * 2);
+                ctx.fillRect(-(toothW + 1.4) / 2, -(rDisk + toothLen + 0.7), toothW + 1.4, toothLen + 1.4);
+                ctx.restore();
             }
-            ctx.closePath();
+            ctx.beginPath();
+            ctx.arc(0, 0, rDisk + 0.8, 0, Math.PI * 2);
             ctx.fill();
-            // Inner ring
+
+            // Drop the halo before drawing the bright fill so edges stay sharp.
             ctx.shadowBlur = 0;
-            ctx.fillStyle = '#a8810f';
+
+            // Brass fill teeth
+            ctx.fillStyle = '#f5c130';
+            for (let i = 0; i < teethCount; i++) {
+                ctx.save();
+                ctx.rotate((i / teethCount) * Math.PI * 2);
+                ctx.fillRect(-toothW / 2, -(rDisk + toothLen), toothW, toothLen + 0.6);
+                ctx.restore();
+            }
+            // Central disk
             ctx.beginPath();
-            ctx.arc(0, 0, rInner - 1.5, 0, Math.PI * 2);
+            ctx.arc(0, 0, rDisk, 0, Math.PI * 2);
             ctx.fill();
-            // Centre hole
-            ctx.fillStyle = '#1a0a00';
+
+            // Stepped inner rings for a machined look
+            ctx.fillStyle = '#c08a14';
             ctx.beginPath();
-            ctx.arc(0, 0, 2.2, 0, Math.PI * 2);
+            ctx.arc(0, 0, rDisk - 1.4, 0, Math.PI * 2);
             ctx.fill();
-            // Shine
-            ctx.fillStyle = '#fff5b0';
+            ctx.fillStyle = '#8c6210';
             ctx.beginPath();
-            ctx.arc(-3.5, -3.5, 1.4, 0, Math.PI * 2);
+            ctx.arc(0, 0, rDisk - 2.8, 0, Math.PI * 2);
             ctx.fill();
+
+            // Centre bolt hole
+            ctx.fillStyle = '#100600';
+            ctx.beginPath();
+            ctx.arc(0, 0, 1.7, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Rim highlight on one tooth (sells the metal)
+            ctx.fillStyle = 'rgba(255,245,176,0.9)';
+            ctx.fillRect(-toothW / 2 + 0.2, -(rDisk + toothLen) + 0.2, 1.0, toothLen);
         } else if (this.type === 'egg') {
             // Glow
             ctx.shadowColor = '#aaffaa';
@@ -2035,21 +2061,43 @@ function startGame() {
     }
 }
 
-// Title-screen entry point: play the intro cutscene first, then start the game.
-// Skipped when the user is jumping to a specific level via ?level=N (other than 1).
+// Title-screen entry point: BEGIN ESCAPE.
+// The intro auto-plays on page load (see bottom of file), so once the player
+// has watched it we go straight into the game on click. If somehow the intro
+// hasn't been seen yet (e.g. they hit the button while the boot cutscene is
+// still up), we replay it before starting.
 function beginNewGameWithIntro() {
     const urlLvl = parseInt(new URLSearchParams(location.search).get('level'), 10);
     const skippingViaUrl = Number.isFinite(urlLvl) && urlLvl >= 1 && urlLvl <= TOTAL_LEVELS && urlLvl !== 1;
     document.getElementById('overlay').style.display = 'none';
     const shopEl = document.getElementById('shop-overlay');
     if (shopEl) shopEl.style.display = 'none';
-    if (skippingViaUrl) {
+    if (skippingViaUrl || cutsceneSeen('intro')) {
         startGame();
         return;
     }
     playCutscene(CUTSCENES.intro, () => {
         markCutsceneSeen('intro');
         startGame();
+    });
+}
+
+// Auto-play the opening cutscene on first page load, before the title screen
+// is shown. Subsequent loads (cutsceneSeen('intro') === true) skip straight to
+// the title. Honours the ?level=N shortcut to bypass the cutscene entirely.
+function maybeAutoPlayBootCutscene() {
+    const urlLvl = parseInt(new URLSearchParams(location.search).get('level'), 10);
+    const skippingViaUrl = Number.isFinite(urlLvl) && urlLvl >= 1 && urlLvl <= TOTAL_LEVELS;
+    if (skippingViaUrl) return;
+    if (cutsceneSeen('intro')) return;
+    const titleOverlay = document.getElementById('overlay');
+    if (titleOverlay) titleOverlay.style.display = 'none';
+    // Defer to next frame so the DOM has fully settled before we render.
+    requestAnimationFrame(() => {
+        playCutscene(CUTSCENES.intro, () => {
+            markCutsceneSeen('intro');
+            if (titleOverlay) titleOverlay.style.display = 'flex';
+        });
     });
 }
 
@@ -2425,3 +2473,6 @@ window.beginNewGameWithIntro = beginNewGameWithIntro;
 window.restartGame = restartGame;
 window.openShop = openShop;
 window.closeShop = closeShop;
+
+// Auto-play the opening cutscene on first page load, before the title screen.
+maybeAutoPlayBootCutscene();
