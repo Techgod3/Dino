@@ -1,5 +1,5 @@
 // ============================================================
-//  DINOLAND - Prehistoric Platformer
+//  GENESIS LAB - Cloning Facility Escape
 //  Full game engine in vanilla JS + Canvas
 // ============================================================
 
@@ -117,41 +117,47 @@ function drawParticles() {
     });
 }
 
-// ── Level Themes ──────────────────────────────────────────────
+// ── Level Themes (Cloning Facility) ───────────────────────────
 const THEMES = {
-    lava: {
-        name: "Lava Valley",
-        bgColors: ['#1a0a2e', '#2d0a00', '#1a1500'],
-        groundColor: '#5c3317',
-        platformColor: '#7a4a20',
+    lab: {
+        name: "Sterile Lab",
+        style: 'lab',
+        bgColors: ['#04111a', '#082030', '#02060a'],
+        groundColor: '#36404a',
+        platformColor: '#4a5560',
+        cloudColor: 'rgba(180,255,230,',
         enemyMix: ['raptor','raptor','pterodactyl','triceratops'],
-        bossName: 'Infernarex',
+        bossName: 'Lab Prototype',
         bossKind: 'triceratops',
-        bossColor: '#c24a00',
+        bossColor: '#bcdce6',
     },
-    jungle: {
-        name: "Jungle Canopy",
-        bgColors: ['#001a00', '#003300', '#001100'],
-        groundColor: '#2d4a1e',
-        platformColor: '#3a6b22',
+    dome: {
+        name: "Bio-Dome",
+        style: 'dome',
+        bgColors: ['#001a14', '#003322', '#001911'],
+        groundColor: '#1e3d2a',
+        platformColor: '#2f5a3a',
+        cloudColor: 'rgba(140,255,180,',
         enemyMix: ['raptor','pterodactyl','raptor','triceratops','pterodactyl'],
-        bossName: 'Canopyraptor',
+        bossName: 'Mutant Hybrid',
         bossKind: 'raptor',
-        bossColor: '#2f8f2f',
+        bossColor: '#5fff7f',
     },
-    volcano: {
-        name: "Volcanic Summit",
-        bgColors: ['#1a0000', '#3d0000', '#1a0800'],
-        groundColor: '#4a1a00',
-        platformColor: '#6b2200',
+    hazard: {
+        name: "Hazard Zone",
+        style: 'hazard',
+        bgColors: ['#1a0008', '#3d0011', '#1a0500'],
+        groundColor: '#4a1a1a',
+        platformColor: '#6b2222',
+        cloudColor: 'rgba(255,140,140,',
         enemyMix: ['raptor','pterodactyl','pterodactyl','triceratops'],
-        bossName: 'Obsidian Wyrm',
+        bossName: 'Apex Clone',
         bossKind: 'pterodactyl',
-        bossColor: '#cc2200',
+        bossColor: '#ff5577',
     },
 };
 
-const THEME_ORDER = ['lava','jungle','volcano'];
+const THEME_ORDER = ['lab','dome','hazard'];
 function isBossLevelIdx(i) { return i % BOSS_EVERY === 0; }
 function nonBossPosition(idx) {
     // 1-based position of `idx` in the sequence of non-boss levels
@@ -456,7 +462,7 @@ class Player {
         if (lives <= 0) {
             triggerGameOver();
         } else {
-            showMessage('💀 OUCH!', 'You lost a life! Keep going...', false);
+            showMessage('⚠️ SPECIMEN HIT!', 'Vitals dropping — keep moving!', false);
         }
     }
 
@@ -1500,12 +1506,16 @@ function drawBackground(levelDef) {
     // Distant mountains/volcano silhouettes (mid parallax)
     drawMountains(levelDef);
 
-    // Clouds/mist (fast parallax + drift)
+    // Clouds/mist (fast parallax + drift) - tinted per theme
+    const cloudColorBase =
+        (levelDef.theme && levelDef.theme.cloudColor) ||
+        levelDef.cloudColor ||
+        'rgba(180,255,230,';
     const cloudShift = camera.x * 0.5;
     clouds.forEach(c => {
         c.x -= c.speed;
         if (c.x + c.w < 0) c.x = W;
-        ctx.fillStyle = `rgba(255,200,100,${c.opacity})`;
+        ctx.fillStyle = `${cloudColorBase}${c.opacity})`;
         ctx.beginPath();
         const cx = ((c.x - cloudShift) % (W + c.w) + (W + c.w)) % (W + c.w) - c.w/2;
         ctx.ellipse(cx + c.w/2, c.y, c.w/2, c.h/2, 0, 0, Math.PI*2);
@@ -1514,54 +1524,106 @@ function drawBackground(levelDef) {
 }
 
 function drawMountains(levelDef) {
-    const themeName = (levelDef.theme && levelDef.theme.name) || levelDef.name;
-    const isVolcano = themeName.includes("Volcanic") || themeName.includes("Lava");
-    const isJungle = themeName.includes("Jungle");
+    const style =
+        (levelDef.theme && levelDef.theme.style) ||
+        levelDef.style ||
+        'lab';
     const parallax = camera.x * 0.3;
+    const t = Date.now();
 
-    if (isVolcano) {
-        // Volcanoes - tile across the viewport using parallax
-        ctx.fillStyle = '#3d1200';
+    if (style === 'lab') {
+        // Sterile-lab: rows of containment cylinders / cloning tanks
+        const tile = 220;
+        const start = Math.floor(parallax / tile) - 1;
+        for (let i = start; i < start + Math.ceil(W / tile) + 3; i++) {
+            const bx = 90 + i * tile - parallax;
+            const bh = 150 + ((i % 3) + 3) % 3 * 30;
+            // Tank chassis (dark steel)
+            ctx.fillStyle = '#1a2630';
+            ctx.fillRect(bx - 22, H - bh, 44, bh);
+            // Top + bottom caps
+            ctx.fillStyle = '#2a3a48';
+            ctx.fillRect(bx - 26, H - bh - 8, 52, 12);
+            ctx.fillRect(bx - 26, H - 14, 52, 8);
+            // Glow tube (cyan growth fluid)
+            const tube = ctx.createLinearGradient(bx, H - bh + 12, bx, H - 18);
+            tube.addColorStop(0,   'rgba(0,255,210,0.55)');
+            tube.addColorStop(0.5, 'rgba(0,180,160,0.55)');
+            tube.addColorStop(1,   'rgba(0,60,90,0.85)');
+            ctx.fillStyle = tube;
+            ctx.fillRect(bx - 12, H - bh + 12, 24, bh - 30);
+            // Bubbles rising inside
+            ctx.fillStyle = 'rgba(200,255,235,0.85)';
+            for (let b = 0; b < 4; b++) {
+                const phase = (t / 30 + i * 53 + b * 41) % (bh - 40);
+                const by = H - 24 - phase;
+                ctx.beginPath();
+                ctx.arc(bx + Math.sin(b + i + t/400) * 5, by, 2, 0, Math.PI*2);
+                ctx.fill();
+            }
+        }
+    } else if (style === 'dome') {
+        // Bio-dome silhouettes with vines spilling out
+        const tile = 320;
+        const start = Math.floor(parallax / tile) - 1;
+        for (let i = start; i < start + Math.ceil(W / tile) + 3; i++) {
+            const bx = 160 + i * tile - parallax;
+            const bh = 130 + ((i % 3) + 3) % 3 * 25;
+            // Dome
+            ctx.fillStyle = '#0c2818';
+            ctx.beginPath();
+            ctx.arc(bx, H - 8, bh, Math.PI, 0);
+            ctx.closePath(); ctx.fill();
+            // Lattice grid (dome ribs)
+            ctx.strokeStyle = 'rgba(80,200,140,0.35)';
+            ctx.lineWidth = 1;
+            for (let r = 0.25; r < 1; r += 0.2) {
+                ctx.beginPath();
+                ctx.arc(bx, H - 8, bh * r, Math.PI, 0);
+                ctx.stroke();
+            }
+            // Vines hanging from the dome
+            ctx.strokeStyle = '#3e7a30';
+            ctx.lineWidth = 2;
+            for (let v = -2; v <= 2; v++) {
+                ctx.beginPath();
+                ctx.moveTo(bx + v * 22, H - bh + 4);
+                ctx.bezierCurveTo(
+                    bx + v * 24 + 6, H - bh * 0.5,
+                    bx + v * 22 - 6, H - bh * 0.2,
+                    bx + v * 22,     H
+                );
+                ctx.stroke();
+            }
+        }
+    } else if (style === 'hazard') {
+        // Wrecked containment + flashing red beacons
         const tile = 290;
         const start = Math.floor(parallax / tile) - 1;
-        for (let i = start; i < start + 5; i++) {
+        for (let i = start; i < start + Math.ceil(W / tile) + 3; i++) {
             const bx = 120 + i * tile - parallax;
             const bh = 130 + ((i % 3) + 3) % 3 * 30;
+            // Ragged silhouette of a broken tank
+            ctx.fillStyle = '#1c0808';
             ctx.beginPath();
             ctx.moveTo(bx - 90, H);
-            ctx.lineTo(bx, H - bh);
+            ctx.lineTo(bx - 60, H - bh * 0.6);
+            ctx.lineTo(bx - 30, H - bh * 0.85);
+            ctx.lineTo(bx + 10, H - bh);
+            ctx.lineTo(bx + 50, H - bh * 0.7);
             ctx.lineTo(bx + 90, H);
             ctx.closePath(); ctx.fill();
-            // Lava glow at tip
-            const lavGrad = ctx.createRadialGradient(bx, H - bh - 5, 2, bx, H - bh, 25);
-            lavGrad.addColorStop(0, 'rgba(255,140,0,0.9)');
-            lavGrad.addColorStop(0.5, 'rgba(255,50,0,0.4)');
-            lavGrad.addColorStop(1, 'rgba(255,0,0,0)');
-            ctx.fillStyle = lavGrad;
+            // Pulsing red alert beacon at the top
+            const flick = (Math.sin(t / 120 + i * 2) + 1) / 2;
+            const beaconY = H - bh - 6;
+            const r = 12 + flick * 10;
+            const beacon = ctx.createRadialGradient(bx, beaconY, 2, bx, beaconY, r + 18);
+            beacon.addColorStop(0,   'rgba(255,90,90,0.95)');
+            beacon.addColorStop(0.5, 'rgba(220,30,30,0.45)');
+            beacon.addColorStop(1,   'rgba(255,0,0,0)');
+            ctx.fillStyle = beacon;
             ctx.beginPath();
-            ctx.arc(bx, H - bh - 5, 25, 0, Math.PI*2);
-            ctx.fill();
-            ctx.fillStyle = '#3d1200';
-        }
-    }
-
-    if (isJungle) {
-        // Trees silhouette tiled across viewport
-        ctx.fillStyle = '#003300';
-        const tile = 80;
-        const start = Math.floor(parallax / tile) - 1;
-        for (let i = start; i < start + Math.ceil(W / tile) + 4; i++) {
-            const tx = i * tile + 20 - parallax;
-            const th = 80 + Math.sin(i * 1.3) * 40;
-            ctx.fillRect(tx + 12, H - th, 10, th);
-            ctx.beginPath();
-            ctx.arc(tx + 17, H - th - 15, 28, 0, Math.PI*2);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(tx + 5, H - th - 5, 20, 0, Math.PI*2);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(tx + 30, H - th - 8, 22, 0, Math.PI*2);
+            ctx.arc(bx, beaconY, r + 14, 0, Math.PI*2);
             ctx.fill();
         }
     }
@@ -1655,7 +1717,7 @@ function loadLevel(levelIdx) {
     camera.x = 0;
     levelTransitioning = false;
     document.getElementById('level-display').textContent =
-        levelDef.isBoss ? `BOSS ${levelIdx}` : `Level ${levelIdx}`;
+        levelDef.isBoss ? `PROTOTYPE ${levelIdx}` : `Sector ${levelIdx}`;
 }
 
 // Camera follows the player, clamped to level bounds
@@ -1694,7 +1756,7 @@ function hideMessage() {
 }
 
 // ── Game Over / Win ───────────────────────────────────────────
-const BTN_STYLE = 'padding:12px 28px;font-size:18px;font-family:Courier New,monospace;font-weight:bold;background:linear-gradient(135deg,#ff6b1a,#cc4400);color:white;border:3px solid #ffd700;border-radius:8px;cursor:pointer;margin:6px;';
+const BTN_STYLE = 'padding:12px 28px;font-size:18px;font-family:Courier New,monospace;font-weight:bold;background:linear-gradient(135deg,#00d4aa,#006e58);color:white;border:3px solid #ffd700;border-radius:8px;cursor:pointer;margin:6px;';
 const SHOP_BTN_STYLE = 'padding:12px 28px;font-size:18px;font-family:Courier New,monospace;font-weight:bold;background:linear-gradient(135deg,#6b3aff,#3a1a88);color:white;border:3px solid #ffd700;border-radius:8px;cursor:pointer;margin:6px;';
 
 function triggerGameOver() {
@@ -1702,10 +1764,10 @@ function triggerGameOver() {
     gameOver = true;
     const ov = document.getElementById('overlay');
     ov.innerHTML = `
-        <div class="deco">💀</div>
-        <h1 style="color:#ff4444">GAME OVER</h1>
-        <div class="subtitle" style="color:#ffaa66">The dinos got you! Score: ${score}</div>
-        <div class="controls-info">You have <span>${bones} 🦴 bones</span> banked — spend them in the shop!</div>
+        <div class="deco">☠️🧬</div>
+        <h1 style="color:#ff4477">SPECIMEN TERMINATED</h1>
+        <div class="subtitle" style="color:#aaffee">Containment failed. Score: ${score}</div>
+        <div class="controls-info">You have <span>${bones} 🦴 bones</span> banked — spend them on new clones in the shop!</div>
         <div style="display:flex;flex-wrap:wrap;justify-content:center;">
             <button id="retry-btn" style="${BTN_STYLE}">🔄 TRY AGAIN</button>
             <button id="shop-btn-over" style="${SHOP_BTN_STYLE}">🛒 GO TO SHOP</button>
@@ -1729,10 +1791,10 @@ function triggerWin() {
     gameOver = true;
     const ov = document.getElementById('overlay');
     ov.innerHTML = `
-        <div class="deco">🏆🦕🎉</div>
-        <h1 style="color:#ffd700">YOU WIN!</h1>
-        <div class="subtitle" style="color:#90ee90">The dinos are free! Final Score: ${score}</div>
-        <div class="controls-info">Bones banked: <span>${bones} 🦴</span> — spend them on sweet new skins!</div>
+        <div class="deco">🏆🧬⚗️</div>
+        <h1 style="color:#ffd700">FACILITY ESCAPED!</h1>
+        <div class="subtitle" style="color:#aaffd6">All clones are free! Final Score: ${score}</div>
+        <div class="controls-info">Bones banked: <span>${bones} 🦴</span> — spend them on new clone skins!</div>
         <div style="display:flex;flex-wrap:wrap;justify-content:center;">
             <button id="retry-btn" style="${BTN_STYLE}">🔄 PLAY AGAIN</button>
             <button id="shop-btn-win" style="${SHOP_BTN_STYLE}">🛒 GO TO SHOP</button>
@@ -1813,7 +1875,7 @@ function renderShop() {
 
     el.innerHTML = `
         <div class="shop-inner">
-            <h2 class="shop-title">🛒 BONE SHOP 🦴</h2>
+            <h2 class="shop-title">🧬 CLONE LAB SHOP 🦴</h2>
             <div class="shop-wallet">Wallet: <b>${bones} 🦴</b></div>
             <div class="skin-grid">${cards}</div>
             <div class="shop-actions">
@@ -2036,10 +2098,10 @@ function drawCanvasHUD() {
     ctx.fillStyle = levelDef.isBoss ? '#ff4444' : '#ffd700';
     ctx.font = 'bold 14px Courier New';
     ctx.textAlign = 'center';
-    const emoji = levelDef.isBoss ? '💀' : '🌋';
+    const emoji = levelDef.isBoss ? '☣️' : '🧪';
     const subtitle = levelDef.isBoss
-        ? `— Defeat ${levelDef.theme.bossName}! —`
-        : '— Reach the portal! —';
+        ? `— Terminate ${levelDef.theme.bossName}! —`
+        : '— Reach the containment portal! —';
     ctx.fillText(`${emoji} ${levelDef.name}  ${subtitle}  ${emoji}`, W/2, 18);
     ctx.textAlign = 'left';
 

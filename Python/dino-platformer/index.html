@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🦕 DinoLand - Prehistoric Platformer</title>
+    <title>🧬 Genesis Lab - Cloning Facility Escape</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
         body {
-            background: #1a0a2e;
+            background: #04101a;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -32,7 +32,7 @@
             align-items: center;
             padding: 8px 16px;
             background: rgba(0,0,0,0.6);
-            border: 2px solid #ff6b1a;
+            border: 2px solid #00d4aa;
             border-bottom: none;
             border-radius: 8px 8px 0 0;
             color: #fff;
@@ -48,7 +48,7 @@
         #level-display { color: #90ee90; }
 
         canvas {
-            border: 3px solid #ff6b1a;
+            border: 3px solid #00d4aa;
             border-radius: 0 0 8px 8px;
             display: block;
             image-rendering: pixelated;
@@ -71,13 +71,13 @@
 
         #overlay h1 {
             font-size: 52px;
-            color: #ff6b1a;
-            text-shadow: 0 0 20px #ff6b1a, 3px 3px 0 #8b3a00;
+            color: #00ffcc;
+            text-shadow: 0 0 20px #00ffcc, 3px 3px 0 #003a44;
             margin-bottom: 10px;
             letter-spacing: 3px;
         }
         #overlay .subtitle {
-            color: #ffd700;
+            color: #aaffee;
             font-size: 18px;
             margin-bottom: 30px;
             text-align: center;
@@ -99,7 +99,7 @@
             font-size: 22px;
             font-family: 'Courier New', monospace;
             font-weight: bold;
-            background: linear-gradient(135deg, #ff6b1a, #cc4400);
+            background: linear-gradient(135deg, #00d4aa, #006e58);
             color: white;
             border: 3px solid #ffd700;
             border-radius: 8px;
@@ -107,14 +107,14 @@
             text-transform: uppercase;
             letter-spacing: 2px;
             transition: all 0.2s;
-            box-shadow: 0 4px 15px rgba(255,107,26,0.5);
+            box-shadow: 0 4px 15px rgba(0,212,170,0.5);
             position: relative;
             z-index: 20;
         }
         #start-btn:hover {
             transform: translateY(-3px);
-            box-shadow: 0 8px 25px rgba(255,107,26,0.8);
-            background: linear-gradient(135deg, #ff8844, #ee5500);
+            box-shadow: 0 8px 25px rgba(0,212,170,0.8);
+            background: linear-gradient(135deg, #1ee6c0, #00aa88);
         }
         #overlay .deco { font-size: 60px; margin-bottom: 5px; }
 
@@ -141,7 +141,7 @@
             left: 0;
             width: 900px;
             height: 500px;
-            background: rgba(8,2,20,0.96);
+            background: rgba(2,12,18,0.96);
             display: none;
             align-items: center;
             justify-content: center;
@@ -160,7 +160,7 @@
             color: #ffd700;
             font-size: 30px;
             letter-spacing: 2px;
-            text-shadow: 0 0 12px #ff6b1a;
+            text-shadow: 0 0 12px #00d4aa;
             margin-bottom: 4px;
         }
         .shop-wallet { color: #f0e68c; font-size: 16px; margin-bottom: 14px; }
@@ -200,7 +200,7 @@
         }
         .shop-btn.equip    { background: linear-gradient(135deg,#2e8b2e,#1c5e1c); }
         .shop-btn.equipped { background: #333; border-color: #666; color: #bbb; cursor: default; }
-        .shop-btn.buy      { background: linear-gradient(135deg,#ff6b1a,#cc4400); }
+        .shop-btn.buy      { background: linear-gradient(135deg,#00d4aa,#006e58); }
         .shop-btn.locked   { background: #222; border-color: #555; color: #888; cursor: not-allowed; }
         .shop-actions { margin-top: 10px; }
     </style>
@@ -209,25 +209,25 @@
 <body>
 <div id="game-wrapper">
     <div id="hud">
-        <div class="hud-item"><span>🦕</span> <span>DinoLand</span></div>
+        <div class="hud-item"><span>🧬</span> <span>Genesis Lab</span></div>
         <div class="hud-item"><span>🦴</span> <span id="bones-display">Bones: 0</span></div>
         <div class="hud-item"><span>⭐</span> <span id="score-display">Score: 0</span></div>
         <div class="hud-item"><span>❤️</span> <span id="lives-display">x5</span></div>
-        <div class="hud-item"><span>🌋</span> <span id="level-display">Level 1</span></div>
+        <div class="hud-item"><span>🧪</span> <span id="level-display">Sector 1</span></div>
     </div>
     <canvas id="gameCanvas" width="900" height="500"></canvas>
     <div id="overlay">
-        <div class="deco">🦕🦖🌋</div>
-        <h1>DINOLAND</h1>
-        <div class="subtitle">A Prehistoric Adventure</div>
+        <div class="deco">🧬🦖⚗️</div>
+        <h1>GENESIS LAB</h1>
+        <div class="subtitle">Escape the cloning facility</div>
         <div class="controls-info">
             <span>← →</span> Move &nbsp;|&nbsp; <span>SPACE / ↑</span> Jump (double jump!) &nbsp;|&nbsp; <span>↓</span> Stomp<br>
-            Collect <span>🦴 Bones</span> and <span>🥚 Eggs</span> | Stomp enemies to defeat them<br>
-            Reach the <span>✨ Exit Portal</span> to advance | Boss fight every 5 levels!
+            Collect <span>🦴 Bones</span> and <span>🥚 Specimen Eggs</span> | Stomp escaped clones to defeat them<br>
+            Reach the <span>✨ Containment Portal</span> to advance | Prototype every 5 sectors!
         </div>
         <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:10px;">
-            <button id="start-btn">&#9654; PLAY NOW</button>
-            <button id="shop-btn" style="padding:14px 40px;font-size:20px;font-family:Courier New,monospace;font-weight:bold;background:linear-gradient(135deg,#6b3aff,#3a1a88);color:white;border:3px solid #ffd700;border-radius:8px;cursor:pointer;text-transform:uppercase;letter-spacing:2px;box-shadow:0 4px 15px rgba(107,58,255,0.5);">&#128722; SHOP</button>
+            <button id="start-btn">&#9654; BEGIN ESCAPE</button>
+            <button id="shop-btn" style="padding:14px 40px;font-size:20px;font-family:Courier New,monospace;font-weight:bold;background:linear-gradient(135deg,#6b3aff,#3a1a88);color:white;border:3px solid #ffd700;border-radius:8px;cursor:pointer;text-transform:uppercase;letter-spacing:2px;box-shadow:0 4px 15px rgba(107,58,255,0.5);">&#128722; CLONE SHOP</button>
         </div>
     </div>
     <div id="shop-overlay"></div>

@@ -1,10 +1,12 @@
-# 🦕 DinoLand
+# 🧬 Genesis Lab — Cloning Facility Escape
 
-A vanilla-JS canvas platformer. No build step, no dependencies — just HTML + JS.
+A vanilla-JS canvas platformer set inside a derelict dino-cloning lab. No build step, no dependencies — just HTML + JS.
+
+Play as a runaway clone fighting through three biome variants — **Sterile Lab**, **Bio-Dome**, and **Hazard Zone** — across 15 sectors with a Prototype boss every 5 sectors.
 
 ## How to run it
 
-The game is a static page that talks to `localStorage`, so it **must be served over HTTP** — double-clicking `index.html` (the `file://` protocol) works in most browsers but some features (like Save Skin) can behave oddly, so serve it instead.
+The game is a static page that talks to `localStorage`, so it **must be served over HTTP** — double-clicking `index.html` (the `file://` protocol) works in most browsers but some features (like saving your skin) can behave oddly, so serve it instead.
 
 ### Option A — VS Code with Live Server (easiest)
 
@@ -37,11 +39,17 @@ Follow the URL it prints (usually http://localhost:3000).
 - **Space / ↑ / W** — Jump (double-jump!)
 - **↓** — Stomp
 
-Collect **🦴 Bones** and **🥚 Eggs**. Stomp enemies to defeat them. Reach the **✨ Exit Portal** to advance. Boss fight every 5 levels.
+Collect **🦴 Bones** and **🥚 Specimen Eggs**. Stomp escaped clones to take them out. Reach the **✨ Containment Portal** to advance to the next sector. Boss **Prototype** every 5 sectors:
 
-## Shop
+| Sector | Biome         | Prototype       |
+| ------ | ------------- | --------------- |
+| 5      | Sterile Lab   | Lab Prototype   |
+| 10     | Bio-Dome      | Mutant Hybrid   |
+| 15     | Hazard Zone   | Apex Clone      |
 
-Click **🛒 SHOP** on the title screen or **🛒 GO TO SHOP** on the Game Over screen to spend bones on skins:
+## Clone Lab Shop
+
+Click **🛒 CLONE SHOP** on the title screen or **🛒 GO TO SHOP** on the Game Over screen to spend bones on skins:
 
 | Skin            | Cost      |
 | --------------- | --------- |
@@ -56,7 +64,7 @@ Bones, owned skins, and the equipped skin persist across runs in `localStorage` 
 
 ## Useful URL tricks
 
-- `index.html?level=N` — jump straight to level `N` (1-15). Handy for testing the boss fights on 5 / 10 / 15.
+- `index.html?level=N` — jump straight to sector `N` (1-15). Handy for testing the prototype fights on 5 / 10 / 15.
 
 ## Troubleshooting
 
