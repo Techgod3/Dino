@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IdeaPicker — Reddit Pain-Point → Startup Idea Engine</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💡</text></svg>">
+</head>
+<body>
+    <!-- ── Hero / Header ─────────────────────────────────── -->
+    <header id="hero">
+        <div class="hero-inner">
+            <div class="logo-row">
+                <span class="logo-icon">💡</span>
+                <h1>IdeaPicker</h1>
+            </div>
+            <p class="tagline">Scan Reddit for real user pain points. Get AI-generated startup ideas with revenue estimates.</p>
+        </div>
+    </header>
+
+    <!-- ── Settings Panel (API Key) ──────────────────────── -->
+    <section id="settings-bar">
+        <div class="settings-inner">
+            <div class="key-group">
+                <label for="api-key">OpenAI API Key</label>
+                <input type="password" id="api-key" placeholder="sk-..." autocomplete="off">
+                <button id="save-key-btn" title="Save key to localStorage">Save</button>
+            </div>
+            <span class="key-hint">Your key stays in your browser. We never send it to our server.</span>
+        </div>
+    </section>
+
+    <!-- ── Search Form ───────────────────────────────────── -->
+    <main>
+        <section id="search-section">
+            <form id="scan-form">
+                <div class="form-row">
+                    <div class="input-group grow">
+                        <label for="subreddits">Subreddits</label>
+                        <input type="text" id="subreddits" placeholder="e.g. SaaS, startups, Entrepreneur, smallbusiness" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="post-limit">Posts per sub</label>
+                        <select id="post-limit">
+                            <option value="25">25</option>
+                            <option value="50" selected>50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label for="time-filter">Time range</label>
+                        <select id="time-filter">
+                            <option value="day">Past 24h</option>
+                            <option value="week" selected>Past week</option>
+                            <option value="month">Past month</option>
+                            <option value="year">Past year</option>
+                            <option value="all">All time</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="input-group grow">
+                        <label for="keywords">Pain-point keywords <span class="opt">(optional)</span></label>
+                        <input type="text" id="keywords" placeholder="e.g. frustrated, hate, wish, annoying, broken, need">
+                    </div>
+                    <div class="input-group">
+                        <label for="sort-by">Sort</label>
+                        <select id="sort-by">
+                            <option value="relevance" selected>Relevance</option>
+                            <option value="hot">Hot</option>
+                            <option value="top">Top</option>
+                            <option value="new">New</option>
+                        </select>
+                    </div>
+                    <button type="submit" id="scan-btn">
+                        <span class="btn-icon">🔍</span> Scan Reddit
+                    </button>
+                </div>
+            </form>
+        </section>
+
+        <!-- ── Progress ──────────────────────────────────── -->
+        <section id="progress-section" class="hidden">
+            <div class="progress-bar-wrap">
+                <div class="progress-bar" id="progress-bar"></div>
+            </div>
+            <p id="progress-text">Initializing scan...</p>
+        </section>
+
+        <!-- ── Stats Row ─────────────────────────────────── -->
+        <section id="stats-row" class="hidden">
+            <div class="stat-card">
+                <span class="stat-num" id="stat-posts">0</span>
+                <span class="stat-label">Posts Scanned</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-num" id="stat-pain">0</span>
+                <span class="stat-label">Pain Points Found</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-num" id="stat-ideas">0</span>
+                <span class="stat-label">Startup Ideas</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-num" id="stat-revenue">$0</span>
+                <span class="stat-label">Total Est. Revenue</span>
+            </div>
+        </section>
+
+        <!-- ── Results ───────────────────────────────────── -->
+        <section id="results-section" class="hidden">
+            <div class="results-header">
+                <h2>Startup Ideas</h2>
+                <div class="results-actions">
+                    <button id="export-csv" class="secondary-btn" title="Export as CSV">📥 CSV</button>
+                    <button id="export-json" class="secondary-btn" title="Export as JSON">📥 JSON</button>
+                </div>
+            </div>
+            <div id="results-grid"></div>
+        </section>
+
+        <!-- ── Empty State ───────────────────────────────── -->
+        <section id="empty-state">
+            <div class="empty-inner">
+                <span class="empty-icon">🚀</span>
+                <h3>Ready to discover your next startup idea?</h3>
+                <p>Enter subreddits above and hit <strong>Scan Reddit</strong> to find real pain points people are talking about.</p>
+                <div class="example-chips">
+                    <span class="chip" data-sub="SaaS">r/SaaS</span>
+                    <span class="chip" data-sub="startups">r/startups</span>
+                    <span class="chip" data-sub="Entrepreneur">r/Entrepreneur</span>
+                    <span class="chip" data-sub="smallbusiness">r/smallbusiness</span>
+                    <span class="chip" data-sub="webdev">r/webdev</span>
+                    <span class="chip" data-sub="freelance">r/freelance</span>
+                    <span class="chip" data-sub="RemoteWork">r/RemoteWork</span>
+                    <span class="chip" data-sub="digitalnomad">r/digitalnomad</span>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- ── Idea Detail Modal ─────────────────────────────── -->
+    <div id="modal-backdrop" class="hidden">
+        <div id="idea-modal">
+            <button id="modal-close">&times;</button>
+            <div id="modal-content"></div>
+        </div>
+    </div>
+
+    <footer>
+        <p>IdeaPicker &mdash; Built with Reddit public data &amp; OpenAI &middot; Your API key never leaves your browser.</p>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
