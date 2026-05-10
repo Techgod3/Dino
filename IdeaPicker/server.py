@@ -207,6 +207,11 @@ def get_demo_posts(subreddit: str, limit: int):
 
 @app.get("/")
 async def index():
+    return FileResponse(ROOT / "reddit.html")
+
+
+@app.get("/standalone")
+async def standalone():
     return FileResponse(ROOT / "index.html")
 
 
